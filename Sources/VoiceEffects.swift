@@ -54,12 +54,12 @@ struct EffectFilter {
     }
 }
 
-// Echo: the voice comes back every 0.28 s, a little thinner and darker each time. Full is a first repeat at half the
-// voice's level, then each one under half of the last, so 5 or 6 can be heard. It can't run away: each trip round
-// the loop takes the repeat down to 0.45 or less (the filters only take away, and softLimit caps what's stored), and
-// all repeats added up stay under the voice, even on a note held for ever (0.5 / (1 - 0.45) = 0.91). While you talk
-// the repeats are turned down, measured against your own recent loudness so a quiet mic works the same; they come up
-// in the pauses.
+// Echo: the voice comes back every 0.28 s, a little thinner and darker each time. Full is a first repeat at three
+// quarters of the voice's level, then each one under half of the last, so 6 or 7 can be heard. It can't run away: each
+// trip round the loop takes the repeat down to 0.45 or less (the filters only take away, and softLimit caps what's
+// stored). On a note held for ever all repeats added up pass the voice (0.75 / (1 - 0.45) = 1.36), and CallMix eases
+// that. While you talk the repeats are turned down, measured against your own recent loudness so a quiet mic works the
+// same; they come up in the pauses.
 //
 // Radio: more and more like a small radio as the slider goes up: a narrower band of sound, a peak where small speakers
 // ring, the tops of the waves worn off, and at the far end light static that follows the voice (none in silence). It
@@ -72,7 +72,7 @@ struct EffectFilter {
 struct VoiceEffects {
     static let echoSeconds = 0.28
     static let tailSeconds = 2.0        // after this, Echo at full is over 50 dB under the voice
-    private static let firstRepeat: Float = 0.5, nextRepeats: Float = 0.45  // at full
+    private static let firstRepeat: Float = 0.75, nextRepeats: Float = 0.45  // at full
     private static let duck: Float = 0.4       // the part of the repeats taken away while talking
     private static let talkingAt: Float = 0.4  // the share of the recent loudness that counts as talking
     private static let radioStart: Float = 0.05  // below this a little of the plain voice is mixed in, so it starts softly

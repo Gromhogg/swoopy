@@ -1215,7 +1215,6 @@ final class ShiftCard: NSView {
     private var active: Bool?
     private var numberActive: Bool?
     private var accessoryScale: ((CGFloat) -> Void)?  // sizes the views next to the picker (addPickerAccessory)
-    var keepsLook: [NSView] = []  // rows that look the same while the card is off (they don't belong to its switch)
 
     // The title, with a small lock after it while Pitch Shift Pro is locked.
     private func showTitle() {
@@ -1458,12 +1457,11 @@ final class ShiftCard: NSView {
         self.active = active
         let target: CGFloat = active ? 1 : 0
         if isShowing { Theme.animate(0.25) { animator().glow = target } } else { glow = target }
-        // A card with the number that's off: everything in it still works, a little fainter (like the number).
+        // A card with the number that's off: the number and its buttons look fainter. Everything under them still works,
+        // so it looks the same.
         guard showsAmount else { return }
         let soft = active ? 1 : Self.offStrength
-        for view in [buttons, picker] + rows where !keepsLook.contains(view) {
-            if isShowing { Theme.animate(0.25) { view.animator().alphaValue = soft } } else { view.alphaValue = soft }
-        }
+        if isShowing { Theme.animate(0.25) { buttons.animator().alphaValue = soft } } else { buttons.alphaValue = soft }
     }
 
     // The card: rounded, a soft shadow, and the purple-pink edge while on.
@@ -1978,7 +1976,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         voiceCard.addRow(radioRow, tight: true)
         voiceCard.addRow(footer)
         echoLabel.widthAnchor.constraint(equalTo: radioLabel.widthAnchor).isActive = true  // the two sliders line up
-        voiceCard.keepsLook = [footer, echoRow, radioRow]  // these work whether the voice is on or off (Echo and Radio on the Voice changer)
         voiceCard.picker.menu?.delegate = self
         voiceCard.picker.target = self
         voiceCard.picker.action = #selector(micPicked)
@@ -3166,7 +3163,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         if realismApply == nil { realism.value = realisticOffered ? voice.changer.realism : 0 }  // (not while it moves)
         realism.isEnabled = active && hasRealistic && realisticOffered
         showSecond(active: active, locked: locked, chosen: chosen)
-        showQuiet(active: active, usable: usable, locked: locked, chosen: chosen)
+        showQuiet(usable: usable, locked: locked, chosen: chosen)
 
         enum Look { case natural, loading, realistic, fallback(Int), unavailable(String) }
         var look: Look
@@ -3232,16 +3229,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
             : "A second AI voice for hums, laughs, sighs, breaths and singing. Talking always uses the main voice."
     }
 
-    // Like the pitch cards' controls, it works while the card is off too (drawn fainter; used once the card is on).
-    private func showQuiet(active: Bool, usable: Bool, locked: Bool, chosen: VoiceEntry?) {
+    // Like the pitch cards' controls, it works while the card is off too (used once the card is on).
+    private func showQuiet(usable: Bool, locked: Bool, chosen: VoiceEntry?) {
         let has = chosen?.manifest.realistic?.quiet != nil
         quietSwitch.locked = locked
         quietSwitch.isOn = voice.changer.quiet
         quietSwitch.isEnabled = usable && has && realisticOffered && voice.changer.realistic
-        let soft: CGFloat = active || locked ? 1 : ShiftCard.offStrength
-        if quietRow.alphaValue != soft {
-            if window?.isVisible == true { Theme.animate(0.25) { quietRow.animator().alphaValue = soft } } else { quietRow.alphaValue = soft }
-        }
         quietSwitch.toolTip = locked ? "Pitch Shift Pro"
             : !realisticOffered ? "The more real voices need a Mac with Apple silicon"
             : chosen != nil && !has ? "\(chosen!.name) has no version that blocks background sounds"
