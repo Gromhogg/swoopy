@@ -1866,7 +1866,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         // Advanced processing (music): keeps the song balanced at big shifts. Turning it on asks first.
         advancedSwitch.onChange = { [weak self] on in self?.advancedPicked(on) }
         hearCard.addRow(ShiftCard.switchRow("Advanced processing", advancedSwitch))
-        // Its tone, Bass ... Treble, kept for each speakers or headphones.
+        // Super Advanced (heavy songs). Free. It and Advanced processing turn each other off.
+        superSwitch.onChange = { [weak self] on in self?.superPicked(on) }
+        hearCard.addRow(ShiftCard.switchRow("Super Advanced", superSwitch))
+        // Advanced processing's tone, Bass ... Treble, kept for each speakers or headphones.
         tone.mark = 0.5
         tone.onChange = { [weak self] value in self?.tonePicked(value) }
         // Locked controls (Pitch Shift Pro) only open the unlock window.
@@ -1887,9 +1890,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         autoEQRow.isHidden = true
         autoEQRow.onScale = { [unowned self] scale in autoEQStrip.scale = scale }
         hearCard.addRow(autoEQRow, tight: true)
-        // Super Advanced (heavy songs). Free. It and Advanced processing turn each other off.
-        superSwitch.onChange = { [weak self] on in self?.superPicked(on) }
-        hearCard.addRow(ShiftCard.switchRow("Super Advanced", superSwitch))
 
         style.onChange = { [weak self] value in self?.stylePicked(value) }
         testButton.bezelStyle = .rounded
@@ -2029,7 +2029,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
 
         // Tab goes through one card, then the next.
         let autoEQViews: [NSView] = [autoEQSwitch] + autoEQStrip.bands + [autoEQStrip.reset]
-        let hearViews: [NSView] = hearCard.keyViews + [advancedSwitch, tone] + autoEQViews + [superSwitch]
+        let hearViews: [NSView] = hearCard.keyViews + [advancedSwitch, superSwitch, tone] + autoEQViews
         let voiceViews: [NSView] = voiceCard.keyViews + [style, testButton, slowSwitch, fastSlider, installButton, soundsButton]
         let changerViews: [NSView] = changerCard.keyViews + [strength, realism, secondSwitch, quietSwitch]
         let order: [NSView] = hearViews + voiceViews + changerViews
