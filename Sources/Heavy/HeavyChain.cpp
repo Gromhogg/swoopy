@@ -25,7 +25,7 @@ struct Settings {
     // Going down, a jump skips ahead, and bigger jumps join best.
     double downJumpMaxMs = 160, downHeldMinMs = 120, downHeldFadeMs = 40;
     double cutHz = 600;       // the lower sound's route carries what is below this
-    bool split = false;       // the lower sound takes its own route
+    bool split = true;        // the lower sound takes its own route
 };
 
 double bessel0(double x) {
