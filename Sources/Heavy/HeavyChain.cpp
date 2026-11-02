@@ -590,8 +590,6 @@ void heavy_process(HeavyChain *chain, const float *const *in, float *const *out,
     for (int i = 0; i < frames; i++) chain->limiter.run(out[0][i], out[1][i]);
 }
 
-int heavy_latency_frames(const HeavyChain *chain) { return chain->delay + chain->limiter.look; }
-
 int heavy_tune(HeavyChain *chain, const char *key, double value) {
     Settings &s = chain->set;
     std::string k = key;
@@ -626,6 +624,8 @@ void heavy_get_info(const HeavyChain *chain, HeavyInfo *info, long long *jumpsAt
     info->meanLikeness = chain->jumps ? chain->likenessSum / chain->jumps : 0;
     if (jumpsAt) for (size_t i = 0; i < chain->jumpLog.size() && int(i) < capacity; i++) jumpsAt[i] = chain->jumpLog[i];
 }
+
+int heavy_latency_frames(const HeavyChain *chain) { return chain->delay + chain->limiter.look; }
 
 struct HeavyLimiter { Limiter limiter; };
 
