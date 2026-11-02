@@ -1,18 +1,32 @@
 #include "HeavyChain.h"
+#include "HeavyTuning.h"
 #include <Accelerate/Accelerate.h>
+#include <rubberband/rubberband-c.h>
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
 #include <cstring>
+#include <string>
 #include <vector>
 
 namespace {
 
-// Times in ms. Chosen on the test set, see the research notes.
-const double DelayMs = 350, FadeMs = 15, JumpMinMs = 4, JumpMaxMs = 160, MatchMs = 25, ToleranceMs = 5, HoldMs = 25, GuardMs = 5;
-const double MatchLowHz = 300, MatchHighHz = 5000;  // what the matching listens to
-const double HitSensitivity = 1.5;                  // lower finds more hits
-const double LimiterCeiling = 0.966;                // -0.3 dBFS
+const double LookAheadMs = 350;
+const double LimiterCeiling = 0.966;  // -0.3 dBFS
+
+// Times in ms. Chosen on the test set.
+struct Settings {
+    double fadeMs = 15, jumpMinMs = 4, jumpMaxMs = 60, matchMs = 25, toleranceMs = 12, holdMs = 25, guardMs = 5;
+    double matchLowHz = 100, matchHighHz = 5000;  // what the matching listens to
+    double sensitivity = 1.5;                     // lower finds more hits
+    double lateMs = 40;       // a jump before a hit waits until this close to the end of the gap, where the note is settled
+    double heldMinMs = 30;    // with no hit in sight, wait for a jump this big
+    double heldFadeMs = 20;   // and fade it this slowly
+    // Going down, a jump skips ahead, and bigger jumps join best.
+    double downJumpMaxMs = 160, downHeldMinMs = 120, downHeldFadeMs = 40;
+    double cutHz = 600;       // the lower sound's route carries what is below this
+    bool split = false;       // the lower sound takes its own route
+};
 
 double bessel0(double x) {
     double sum = 1, term = 1;
@@ -28,7 +42,7 @@ struct HitFinder {
     FFTSetup fft = nullptr;
     std::vector<float> window, buffer, scratch, re, im, previous, magnitude;
     float rises[Median] = {}, sorted[Median] = {}, recent[Around * 2 + 1] = {};
-    double mean = 0, variance = 1;
+    double mean = 0, variance = 1, sensitivity = 1.5;
 
     void init(double rate, int scale) {
         size = 1024 * scale; hop = 128 * scale;
@@ -72,7 +86,7 @@ struct HitFinder {
         variance += a * ((value - mean) * (value - mean) - variance);
         if (frames < 60 || variance < 1e-12) return -1;
         float middle = recent[Around];
-        if (middle <= 1e-6f || middle < mean + HitSensitivity * std::sqrt(variance) || sinceHit < minGap) return -1;
+        if (middle <= 1e-6f || middle < mean + sensitivity * std::sqrt(variance) || sinceHit < minGap) return -1;
         for (float r : recent) if (r > middle) return -1;
         sinceHit = 0;
         return size / 2 + (MedianMiddle + Around) * hop;
@@ -165,11 +179,167 @@ struct Limiter {
     }
 };
 
+// Cuts the sound with a filter that adds back exactly. Below the cut, jumps are heard as a wobble, because the strong
+// low notes are too few and too steady to hide them. That part goes through Rubber Band and stays at true time. Above
+// the cut the tape keeps the sharp pulses that make a distorted guitar sound clean.
+struct LowRoute {
+    static constexpr int Hop = 1024;
+    int taps = 2401, half = 1200, fftSize = 4096, log2Size = 12, fill = 0;
+    FFTSetup fft = nullptr;
+    RubberBandState shifter = nullptr;
+    std::vector<float> filterRe, filterIm, re, im, scratch, history[2], gathered[2], low[2], high[2], delayLine[2];
+    int64_t delayAt = 0;
+    std::vector<float> plain[2], shifted[2];   // the lower sound as it came, and through Rubber Band
+    float *outs[2] = {nullptr, nullptr};
+    const float *lowIn[2] = {nullptr, nullptr};
+    std::vector<float> retrieved[2];
+    int64_t size = 0, mask = 0, shiftedCount = 0, primed = 0;
+    int offset = 0, oldOffset = 0, offsetFade = 0, fadeFrames = 960;
+    double blend = 0, blendStep = 0;
+
+    void design(double rate, double cutHz) {
+        std::vector<float> h(fftSize, 0.f);
+        double sum = 0, m = half;
+        for (int i = 0; i < taps; i++) {
+            double x = i - m, s = std::fabs(x) < 1e-9 ? 2 * cutHz / rate : std::sin(2 * M_PI * cutHz / rate * x) / (M_PI * x);
+            double u = x / (m + 1), w = bessel0(9.0 * std::sqrt(std::max(0.0, 1 - u * u))) / bessel0(9.0);
+            h[i] = float(s * w); sum += s * w;
+        }
+        for (auto &v : h) v = float(v / sum);
+        for (int i = 0; i < fftSize / 2; i++) { filterRe[i] = h[2 * i]; filterIm[i] = h[2 * i + 1]; }
+        DSPSplitComplex z{filterRe.data(), filterIm.data()};
+        vDSP_fft_zrip(fft, &z, 1, log2Size, kFFTDirection_Forward);
+    }
+
+    void init(double rate, int64_t ringSize, double cutHz) {
+        taps = int(0.05 * rate) | 1;
+        half = (taps - 1) / 2;
+        fftSize = 1024; log2Size = 10;
+        while (fftSize < taps + Hop) { fftSize *= 2; log2Size++; }
+        fft = vDSP_create_fftsetup(log2Size, kFFTRadix2);
+        re.resize(fftSize / 2); im.resize(fftSize / 2); scratch.resize(fftSize);
+        filterRe.resize(fftSize / 2); filterIm.resize(fftSize / 2);
+        design(rate, cutHz);
+        for (int c = 0; c < 2; c++) {
+            history[c].assign(fftSize, 0.f); gathered[c].assign(Hop, 0.f); low[c].assign(Hop, 0.f); high[c].assign(Hop, 0.f);
+            delayLine[c].assign(half, 0.f);
+            plain[c].assign(ringSize, 0.f); shifted[c].assign(ringSize, 0.f); retrieved[c].assign(4096, 0.f);
+        }
+        size = ringSize; mask = ringSize - 1;
+        fadeFrames = int(0.02 * rate);
+        blendStep = 1.0 / fadeFrames;
+        shifter = rubberband_new((unsigned)std::lround(rate), 2,
+                                 RubberBandOptionProcessRealTime | RubberBandOptionEngineFiner | RubberBandOptionChannelsTogether |
+                                     RubberBandOptionPitchHighConsistency, 1.0, 1.0);
+        rubberband_set_max_process_size(shifter, Hop);
+        offset = oldOffset = rubberbandOffset();
+        // Rubber Band makes memory when it first gives out sound, so that happens here. The real stream starts after it.
+        std::vector<float> quiet(Hop, 0.f);
+        const float *silence[2] = {quiet.data(), quiet.data()};
+        while (shiftedCount == 0) {
+            rubberband_process(shifter, silence, Hop, 0);
+            primed += Hop;
+            collect();
+        }
+    }
+    ~LowRoute() {
+        if (fft) vDSP_destroy_fftsetup(fft);
+        if (shifter) rubberband_delete(shifter);
+    }
+    // Where a sample comes out of Rubber Band, against where it went in. It moves with the amount.
+    int rubberbandOffset() const {
+        return int(rubberband_get_start_delay(shifter)) - int(rubberband_get_preferred_start_pad(shifter));
+    }
+    // At normal pitch this route skips Rubber Band, so it keeps its last pitch: leaving exactly 1 makes a break in the sound.
+    void setSpeed(double speed) {
+        if (speed == 1) return;
+        rubberband_set_pitch_scale(shifter, speed);
+        int now = rubberbandOffset();
+        if (now != offset) { oldOffset = offset; offset = now; offsetFade = fadeFrames; }
+    }
+    // One sample in. True when a Hop of low and high is ready.
+    bool push(float left, float right) {
+        gathered[0][fill] = left; gathered[1][fill] = right;
+        if (++fill < Hop) return false;
+        fill = 0;
+        for (int c = 0; c < 2; c++) {
+            float *h = history[c].data();
+            std::memmove(h, h + Hop, sizeof(float) * (fftSize - Hop));
+            std::memcpy(h + fftSize - Hop, gathered[c].data(), sizeof(float) * Hop);
+            for (int i = 0; i < fftSize / 2; i++) { re[i] = h[2 * i]; im[i] = h[2 * i + 1]; }
+            DSPSplitComplex z{re.data(), im.data()};
+            vDSP_fft_zrip(fft, &z, 1, log2Size, kFFTDirection_Forward);
+            float dc = re[0] * filterRe[0], top = im[0] * filterIm[0];
+            for (int i = 1; i < fftSize / 2; i++) {
+                float a = re[i] * filterRe[i] - im[i] * filterIm[i], b = re[i] * filterIm[i] + im[i] * filterRe[i];
+                re[i] = a; im[i] = b;
+            }
+            re[0] = dc; im[0] = top;
+            vDSP_fft_zrip(fft, &z, 1, log2Size, kFFTDirection_Inverse);
+            for (int i = 0; i < fftSize / 2; i++) { scratch[2 * i] = re[i]; scratch[2 * i + 1] = im[i]; }
+            float scale = 1.f / (4 * fftSize);
+            int64_t at = delayAt;
+            float *d = delayLine[c].data();
+            for (int i = 0; i < Hop; i++) {
+                float l = scratch[fftSize - Hop + i] * scale;
+                float x = gathered[c][i];
+                float old = d[(at + i) % half];
+                d[(at + i) % half] = x;
+                low[c][i] = l; high[c][i] = old - l;
+            }
+        }
+        delayAt = (delayAt + Hop) % half;
+        return true;
+    }
+    // After push returned true: the lower sound goes through Rubber Band. `count` is how many came before it.
+    void shiftLows(int64_t count) {
+        for (int c = 0; c < 2; c++) {
+            lowIn[c] = low[c].data();
+            for (int i = 0; i < Hop; i++) plain[c][(count + i) & mask] = low[c][i];
+        }
+        rubberband_process(shifter, lowIn, Hop, 0);
+        collect();
+    }
+    void collect() {
+        int available;
+        while ((available = rubberband_available(shifter)) > 0) {
+            int n = std::min(available, 4096);
+            outs[0] = retrieved[0].data(); outs[1] = retrieved[1].data();
+            int got = int(rubberband_retrieve(shifter, outs, unsigned(n)));
+            for (int c = 0; c < 2; c++)
+                for (int i = 0; i < got; i++) shifted[c][(shiftedCount + i) & mask] = retrieved[c][i];
+            shiftedCount += got;
+        }
+    }
+    inline float readShifted(int c, int64_t position) const {
+        position += primed;
+        return position >= 0 && position < shiftedCount ? shifted[c][position & mask] : 0.f;
+    }
+    // The lower sound for position `k`. At normal pitch it skips Rubber Band, so the sound is untouched.
+    inline void read(int64_t k, bool shifting, float &left, float &right) {
+        if (shifting) blend = std::min(1.0, blend + blendStep); else blend = std::max(0.0, blend - blendStep);
+        float out[2] = {0, 0};
+        for (int c = 0; c < 2; c++) {
+            float plainLow = k >= 0 ? plain[c][k & mask] : 0.f;
+            if (blend <= 0) { out[c] = plainLow; continue; }
+            float v = readShifted(c, k + offset);
+            if (offsetFade > 0) {
+                float t = float(offsetFade) / fadeFrames;
+                v = v * (1 - t) + readShifted(c, k + oldOffset) * t;
+            }
+            out[c] = float(blend) * v + float(1 - blend) * plainLow;
+        }
+        if (offsetFade > 0) offsetFade--;
+        left += out[0]; right += out[1];
+    }
+};
+
 }  // namespace
 
 struct HeavyChain {
+    Settings set;
     double rate = 48000, speed = 1, semis = 0;
-    int delay = 16800, hitStep = 120, fadeLength = 720;
+    int delay = 19000, hitStep = 120, fadeLength = 720;
     int64_t size = 1 << 18, mask = (1 << 18) - 1, written = 0, played = 0;
     std::vector<float> ring[2], match[2], quarter[2];
     std::vector<uint8_t> hits;
@@ -181,17 +351,48 @@ struct HeavyChain {
     float likeness = 1;
     double lowState[2] = {0, 0}, highState[2] = {0, 0}, lowK = 0, highK = 0;
     float quarterSum[2] = {0, 0};
+    int fadeNow = 720, planFade = 720;
+    LowRoute route;
+    int tapeDelay = 16800, lookAhead = 16800;
     bool planned = false;
     double planAt = 0, planJump = 0, planLikeness = 0;
+    long long jumps = 0, forced = 0;
+    double likenessSum = 0;
+    std::vector<long long> jumpLog;
+
+    void applySettings() {
+        lowK = 1 - std::exp(-2 * M_PI * set.matchLowHz / rate);
+        highK = 1 - std::exp(-2 * M_PI * set.matchHighHz / rate);
+        finder.sensitivity = set.sensitivity;
+    }
 
     void setSemis(double value) {
         semis = std::max(-24.0, std::min(24.0, value));
         speed = semis == 0 ? 1.0 : std::pow(2.0, semis / 12);
         reader.setSpeed(speed);
-        fadeLength = std::max(16, int(FadeMs * 0.001 * rate / std::max(1.0, speed)));
+        fadeLength = std::max(16, int(set.fadeMs * 0.001 * rate / std::max(1.0, speed)));
+        route.setSpeed(speed);
         planned = false;
     }
 
+    void applyDelay() {
+        lookAhead = int(LookAheadMs * 0.001 * rate);
+        tapeDelay = lookAhead + (set.split ? LowRoute::Hop : 0);
+        delay = tapeDelay + (set.split ? route.half : 0);
+        head = -double(tapeDelay);
+    }
+
+    // The sound on its way in. Split: the upper part goes to the tape, a Hop at a time, the lower part to Rubber Band.
+    void take(const float *left, const float *right, int frames) {
+        if (!set.split) { push(left, right, frames); return; }
+        for (int i = 0; i < frames; i++) {
+            if (!route.push(left[i], right[i])) continue;
+            route.shiftLows(written);
+            push(route.high[0].data(), route.high[1].data(), LowRoute::Hop);
+        }
+    }
+
+    // Hits are found in what the tape plays: only those can be repeated or skipped.
     void push(const float *left, const float *right, int frames) {
         for (int i = 0; i < frames; i++, written++) {
             ring[0][written & mask] = left[i]; ring[1][written & mask] = right[i];
@@ -255,14 +456,17 @@ struct HeavyChain {
     void jump(double by, double alike) {
         nextHead = head + by;
         fade = 0;
+        fadeNow = planned ? planFade : fadeLength;
         likeness = float(std::max(0.0, std::min(1.0, alike)));
-        waitAfterJump = int(JumpMinMs * 0.001 * rate);
+        waitAfterJump = int(set.jumpMinMs * 0.001 * rate);
         planned = false;
+        if (jumpLog.size() < jumpLog.capacity()) jumpLog.push_back(played);  // checks only: never grows
+        jumps++; likenessSum += likeness;
     }
 
     // Finds the jump that lands the next hit on time, and the moment in the gap where it joins best.
     void plan() {
-        double trueTime = double(played) - delay;
+        double trueTime = double(played) - tapeDelay;
         if (trueTime < 0) return;
         double error = head - trueTime;
         if (speed == 1) {  // at 0 the head sits exactly on true time, so the sound is untouched
@@ -270,19 +474,26 @@ struct HeavyChain {
             return;
         }
         // Safety: the head must never reach sound that hasn't arrived.
-        if (std::fabs(error) > 0.85 * delay) { jump(-error, 0); return; }
+        if (std::fabs(error) > 0.85 * lookAhead) { jump(-error, 0); forced++; return; }
         if (planned) { if (head >= planAt) jump(planJump, planLikeness); return; }
-        double fadeRead = fadeLength * speed, guard = GuardMs * 0.001 * rate, hold = HoldMs * 0.001 * rate;
+        double fadeRead = fadeLength * speed, guard = set.guardMs * 0.001 * rate, hold = set.holdMs * 0.001 * rate;
         double seen = double(written) - 64;
         if (seen - head < fadeRead + guard) return;
         int64_t hitAt = hitAfter(head + fadeRead + guard, seen);
         bool real = hitAt >= 0;
         double target = real ? double(hitAt) : seen;
         double need = (target - speed * (target - trueTime)) - head;  // landing on time; the same at any moment in the gap
-        int minJump = int(JumpMinMs * 0.001 * rate), maxJump = int(JumpMaxMs * 0.001 * rate), tolerance = int(ToleranceMs * 0.001 * rate);
-        if (!real) need *= 0.5;  // nothing to land on yet: take part of it, and look again
+        bool down = speed < 1;
+        int minJump = int(set.jumpMinMs * 0.001 * rate), maxJump = int((down ? set.downJumpMaxMs : set.jumpMaxMs) * 0.001 * rate), tolerance = int(set.toleranceMs * 0.001 * rate);
+        int fadeUse = fadeLength;
+        if (!real) {
+            if (std::fabs(need) < (down ? set.downHeldMinMs : set.heldMinMs) * 0.001 * rate) return;
+            fadeUse = std::max(16, int((down ? set.downHeldFadeMs : set.heldFadeMs) * 0.001 * rate / std::max(1.0, speed)));
+            fadeRead = fadeUse * speed;
+        }
         if (std::fabs(need) < minJump) return;
-        if (std::fabs(need) > maxJump) need = need > 0 ? maxJump : -maxJump;
+        bool capped = std::fabs(need) > maxJump;
+        if (capped) need = need > 0 ? maxJump : -maxJump;
         double last = double(hitBefore(head, 0.5 * rate));
         double amount = std::fabs(need), low, high;
         bool part = false;
@@ -297,12 +508,16 @@ struct HeavyChain {
         else { low = std::max(head, last + hold); high = target - amount - fadeRead - guard; }
         high = std::min(high, seen - amount - fadeRead);
         if (part) high = std::min(high, low + 0.02 * rate);  // more jumps must follow in this gap, so go early
+        // Going down each jump moves the head towards the hit, so a jump too big to take at once is spread through the gap.
+        else if (capped && need > 0) high = std::min(high, low + 0.02 * rate);
+        else if (real) low = std::max(low, high - set.lateMs * 0.001 * rate);
         if (high <= low) return;
-        const int stepTime = int(0.005 * rate), length = int(MatchMs * 0.001 * rate), lengthRough = std::max(8, length / 4);
+        const int stepTime = int(0.005 * rate), length = int(set.matchMs * 0.001 * rate), lengthRough = std::max(8, length / 4);
         double best = -2; int64_t bestAt = 0; int bestJump = 0;
         for (double p = low; p <= high; p += stepTime) {
             for (int j = int(need) - tolerance; j <= int(need) + tolerance; j += 4) {
                 if ((j < 0) != (need < 0) || std::abs(j) < minJump) continue;
+                if (p + j < 0) continue;
                 double q = likenessRough(int64_t(p), j, lengthRough);
                 if (q > best) { best = q; bestAt = int64_t(p); bestJump = j; }
             }
@@ -313,26 +528,27 @@ struct HeavyChain {
             double q = likenessExact(bestAt, j, length);
             if (q > bestExact) { bestExact = q; exactJump = j; }
         }
-        planned = true; planAt = double(bestAt); planJump = exactJump; planLikeness = bestExact;
+        planned = true; planAt = double(bestAt); planJump = exactJump; planLikeness = bestExact; planFade = fadeUse;
     }
 
     void pull(float *left, float *right, int frames) {
         for (int i = 0; i < frames; i++, played++) {
-            if (played < delay) head = double(played) - delay;
+            if (played < tapeDelay) head = double(played) - tapeDelay;
             if (fade < 0 && waitAfterJump <= 0 && (played % 48) == 0) plan();
             if (waitAfterJump > 0) waitAfterJump--;
             float l = reader.read(ring[0].data(), mask, head), r = reader.read(ring[1].data(), mask, head);
             if (fade >= 0) {
                 // Alike sounds add in step, so they fade evenly. Different sounds add as powers, so they fade by power.
-                float t = std::min(1.f, float(fade) / fadeLength);
+                float t = std::min(1.f, float(fade) / fadeNow);
                 float even = 0.5f - 0.5f * std::cos(float(M_PI) * t);
                 float powerIn = std::sin(0.5f * float(M_PI) * t), powerOut = std::cos(0.5f * float(M_PI) * t);
                 float gainIn = likeness * even + (1 - likeness) * powerIn, gainOut = likeness * (1 - even) + (1 - likeness) * powerOut;
                 l = gainOut * l + gainIn * reader.read(ring[0].data(), mask, nextHead);
                 r = gainOut * r + gainIn * reader.read(ring[1].data(), mask, nextHead);
                 nextHead += speed;
-                if (++fade >= fadeLength) { head = nextHead - speed; fade = -1; }
+                if (++fade >= fadeNow) { head = nextHead - speed; fade = -1; }
             }
+            if (set.split) route.read(played - tapeDelay, speed != 1, l, r);
             left[i] = l; right[i] = r;
             head += speed;
         }
@@ -345,19 +561,19 @@ HeavyChain *heavy_new(double sampleRate, int maxFrames) {
     if (sampleRate < 8000 || maxFrames < 1) return nullptr;
     HeavyChain *chain = new HeavyChain();
     chain->rate = sampleRate;
-    chain->delay = int(DelayMs * 0.001 * sampleRate);
     chain->hitStep = std::max(1, int(0.0025 * sampleRate));
     int64_t size = 1 << 16;
     while (size < int64_t(5 * sampleRate)) size *= 2;
     chain->size = size; chain->mask = size - 1;
     for (int c = 0; c < 2; c++) { chain->ring[c].assign(size, 0.f); chain->match[c].assign(size, 0.f); chain->quarter[c].assign(size / 4, 0.f); }
     chain->hits.assign(size / chain->hitStep + 1, 0);
-    chain->lowK = 1 - std::exp(-2 * M_PI * MatchLowHz / sampleRate);
-    chain->highK = 1 - std::exp(-2 * M_PI * MatchHighHz / sampleRate);
+    chain->applySettings();
     chain->finder.init(sampleRate, std::max(1, int(std::lround(sampleRate / 48000))));
     chain->limiter.init(sampleRate);
     chain->reader.init();
-    chain->head = -double(chain->delay);
+    chain->jumpLog.reserve(20000);
+    chain->route.init(sampleRate, size, chain->set.cutHz);
+    chain->applyDelay();
     chain->setSemis(0);
     return chain;
 }
@@ -369,12 +585,47 @@ void heavy_set_semis(HeavyChain *chain, double semis) {
 }
 
 void heavy_process(HeavyChain *chain, const float *const *in, float *const *out, int frames) {
-    chain->push(in[0], in[1], frames);
+    chain->take(in[0], in[1], frames);
     chain->pull(out[0], out[1], frames);
     for (int i = 0; i < frames; i++) chain->limiter.run(out[0][i], out[1][i]);
 }
 
 int heavy_latency_frames(const HeavyChain *chain) { return chain->delay + chain->limiter.look; }
+
+int heavy_tune(HeavyChain *chain, const char *key, double value) {
+    Settings &s = chain->set;
+    std::string k = key;
+    if (k == "fadems") s.fadeMs = value;
+    else if (k == "jumpminms") s.jumpMinMs = value;
+    else if (k == "jumpmaxms") s.jumpMaxMs = value;
+    else if (k == "matchms") s.matchMs = value;
+    else if (k == "tolerancems") s.toleranceMs = value;
+    else if (k == "holdms") s.holdMs = value;
+    else if (k == "guardms") s.guardMs = value;
+    else if (k == "matchlowhz") s.matchLowHz = value;
+    else if (k == "matchhighhz") s.matchHighHz = value;
+    else if (k == "sensitivity") s.sensitivity = value;
+    else if (k == "latems") s.lateMs = value;
+    else if (k == "heldminms") s.heldMinMs = value;
+    else if (k == "heldfadems") s.heldFadeMs = value;
+    else if (k == "downjumpmaxms") s.downJumpMaxMs = value;
+    else if (k == "downheldminms") s.downHeldMinMs = value;
+    else if (k == "downheldfadems") s.downHeldFadeMs = value;
+    else if (k == "split") s.split = value != 0;
+    else if (k == "cuthz") { s.cutHz = value; chain->route.design(chain->rate, value); }
+    else return 0;
+    chain->applySettings();
+    chain->applyDelay();
+    chain->setSemis(chain->semis);
+    return 1;
+}
+
+void heavy_get_info(const HeavyChain *chain, HeavyInfo *info, long long *jumpsAt, int capacity) {
+    info->jumps = chain->jumps;
+    info->forced = chain->forced;
+    info->meanLikeness = chain->jumps ? chain->likenessSum / chain->jumps : 0;
+    if (jumpsAt) for (size_t i = 0; i < chain->jumpLog.size() && int(i) < capacity; i++) jumpsAt[i] = chain->jumpLog[i];
+}
 
 struct HeavyLimiter { Limiter limiter; };
 

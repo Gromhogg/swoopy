@@ -1,8 +1,9 @@
 // "Super Advanced" for What you hear: pitch shifting made for heavy songs. Distorted guitars are trains of sharp pulses,
 // and a shifter that works on frequencies scrambles them, which makes loud songs watery and pushes their peaks over full
 // scale. This one plays the sound like tape, r times faster or slower, so every waveform keeps its exact shape. To stay
-// in time it jumps back or forward between drum hits, by the amount that lands the next hit on time, at the moment the
-// sound before and after the jump match best. A safety limiter at the end keeps the output at or below -0.3 dBFS.
+// in time it jumps back or forward, by the amount that lands the next hit on time, just before that hit, at the moment
+// the sound on both sides matches best. Below 600 Hz the sound goes through Rubber Band instead, because jumps there are
+// heard as a wobble. A safety limiter at the end keeps the output at or below -0.3 dBFS.
 //
 // Mac only (it uses Accelerate). Plain C API, so Swift can call it through the bridging header.
 // Create, use and delete from one thread at a time. heavy_process and heavy_set_semis make no memory, take no locks and
