@@ -1,16 +1,16 @@
-; Pitch Shift for Windows (beta): the installer (Inno Setup 6.6 or newer). One file for x64 and ARM64 PCs.
+; Swoopy for Windows (beta): the installer (Inno Setup 6.6 or newer). One file for x64 and ARM64 PCs.
 ;
-;   ISCC /DAppVersion=2.0.0-beta.3 /DDistX64=C:\dist-x64 /DDistArm64=C:\dist-arm64 PitchShift.iss
-;   -> output\PitchShift-Setup.exe
+;   ISCC /DAppVersion=2.0.0-beta.3 /DDistX64=C:\dist-x64 /DDistArm64=C:\dist-arm64 Swoopy.iss
+;   -> output\Swoopy-Setup.exe
 ;
-; Each dist folder holds PitchShift.exe, PitchShiftEngine.dll and PitchShiftTool.exe for that processor.
+; Each dist folder holds Swoopy.exe, SwoopyEngine.dll and SwoopyTool.exe for that processor.
 ;
 ; Options when running Setup (on top of Inno Setup's own /SILENT, /VERYSILENT, /NORESTART...):
-;   /NOLAUNCH      don't open Pitch Shift at the end (for the GitHub checks)
+;   /NOLAUNCH      don't open Swoopy at the end (for the GitHub checks)
 ;   /CABLESILENT   install VB-CABLE without VB-Audio's window (for the GitHub checks)
 ; Options for the uninstaller (unins000.exe), used when it runs silently:
-;   /REMOVECABLE   also remove Pitch Shift Mic (VB-CABLE), if Pitch Shift installed it
-;   /DELETESETTINGS  also delete the person's Pitch Shift settings
+;   /REMOVECABLE   also remove Swoopy Mic (VB-CABLE), if Swoopy installed it
+;   /DELETESETTINGS  also delete the person's Swoopy settings
 
 #ifndef AppVersion
   #define AppVersion "2.0.0-beta"
@@ -26,7 +26,7 @@
 #endif
 
 ; VB-CABLE (the virtual microphone) by VB-Audio.
-;   0 = download it from vb-audio.com (checked against a known SHA-256 by PitchShiftTool) and show
+;   0 = download it from vb-audio.com (checked against a known SHA-256 by SwoopyTool) and show
 ;       VB-Audio's own setup window, where the person clicks "Install Driver".
 ;   1 = put the VB-CABLE pack inside this installer and install it without a window.
 ;       Only switch to 1 once VB-Audio has said bundling is OK. Put VBCABLE_Driver_Pack45.zip next to this file.
@@ -37,16 +37,16 @@
 
 [Setup]
 AppId={{6F1C2B7E-4D8A-4E3B-9A61-7C2E5D0B8F14}
-AppName=Pitch Shift
+AppName=Swoopy
 AppVersion={#AppVersion}
-AppVerName=Pitch Shift {#AppVersion}
+AppVerName=Swoopy {#AppVersion}
 VersionInfoVersion={#NumericVersion}
-AppPublisher=Pitch Shift
-AppPublisherURL=https://github.com/Gromhogg/pitch-shift
-AppSupportURL=https://github.com/Gromhogg/pitch-shift/issues
-AppUpdatesURL=https://github.com/Gromhogg/pitch-shift/releases
+AppPublisher=Swoopy
+AppPublisherURL=https://github.com/Gromhogg/swoopy
+AppSupportURL=https://github.com/Gromhogg/swoopy/issues
+AppUpdatesURL=https://github.com/Gromhogg/swoopy/releases
 AppCopyright=GPL-3.0-or-later
-DefaultDirName={autopf}\Pitch Shift
+DefaultDirName={autopf}\Swoopy
 DisableDirPage=yes
 DisableProgramGroupPage=yes
 DisableReadyPage=yes
@@ -55,43 +55,52 @@ ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 MinVersion=10.0.22000
 OutputDir=output
-OutputBaseFilename=PitchShift-Setup
+OutputBaseFilename=Swoopy-Setup
 SetupIconFile=..\app\AppIcon.ico
-UninstallDisplayIcon={app}\PitchShift.exe
-UninstallDisplayName=Pitch Shift (beta)
+UninstallDisplayIcon={app}\Swoopy.exe
+UninstallDisplayName=Swoopy (beta)
 WizardStyle=modern dynamic
 Compression=lzma2/max
 SolidCompression=yes
 InfoBeforeFile=notice.txt
-; Pitch Shift is closed by our own code below (it lives in the tray, so Windows' way doesn't fit).
+; Swoopy is closed by our own code below (it lives in the tray, so Windows' way doesn't fit).
 CloseApplications=no
 RestartApplications=no
 SetupLogging=yes
 
 [Messages]
-InfoBeforeLabel=Please read this before installing Pitch Shift.
+InfoBeforeLabel=Please read this before installing Swoopy.
 
 [Files]
-Source: "{#DistX64}\PitchShift.exe"; DestDir: "{app}"; Check: not IsArm64; Flags: ignoreversion
-Source: "{#DistX64}\PitchShiftEngine.dll"; DestDir: "{app}"; Check: not IsArm64; Flags: ignoreversion
-Source: "{#DistX64}\PitchShiftTool.exe"; DestDir: "{app}"; Check: not IsArm64; Flags: ignoreversion
-Source: "{#DistArm64}\PitchShift.exe"; DestDir: "{app}"; Check: IsArm64; Flags: ignoreversion
-Source: "{#DistArm64}\PitchShiftEngine.dll"; DestDir: "{app}"; Check: IsArm64; Flags: ignoreversion
-Source: "{#DistArm64}\PitchShiftTool.exe"; DestDir: "{app}"; Check: IsArm64; Flags: ignoreversion
+Source: "{#DistX64}\Swoopy.exe"; DestDir: "{app}"; Check: not IsArm64; Flags: ignoreversion
+Source: "{#DistX64}\SwoopyEngine.dll"; DestDir: "{app}"; Check: not IsArm64; Flags: ignoreversion
+Source: "{#DistX64}\SwoopyTool.exe"; DestDir: "{app}"; Check: not IsArm64; Flags: ignoreversion
+Source: "{#DistArm64}\Swoopy.exe"; DestDir: "{app}"; Check: IsArm64; Flags: ignoreversion
+Source: "{#DistArm64}\SwoopyEngine.dll"; DestDir: "{app}"; Check: IsArm64; Flags: ignoreversion
+Source: "{#DistArm64}\SwoopyTool.exe"; DestDir: "{app}"; Check: IsArm64; Flags: ignoreversion
 Source: "..\..\LICENSE"; DestDir: "{app}"; DestName: "LICENSE.txt"; Flags: ignoreversion
 Source: "notice.txt"; DestDir: "{app}"; DestName: "NOTICE.txt"; Flags: ignoreversion
 #if BundleCable
 Source: "{#CablePack}"; DestDir: "{tmp}"; Flags: deleteafterinstall
 #endif
 
+[InstallDelete]
+; Files and shortcuts of older versions (named Pitch Shift). An update keeps their folder.
+Type: files; Name: "{app}\PitchShift.exe"
+Type: files; Name: "{app}\PitchShiftEngine.dll"
+Type: files; Name: "{app}\PitchShiftTool.exe"
+Type: files; Name: "{autoprograms}\Pitch Shift.lnk"
+Type: files; Name: "{autoprograms}\Pitch Shift Diagnostics.lnk"
+Type: files; Name: "{autodesktop}\Pitch Shift.lnk"
+
 [Icons]
-Name: "{autoprograms}\Pitch Shift"; Filename: "{app}\PitchShift.exe"
-Name: "{autoprograms}\Pitch Shift Diagnostics"; Filename: "{app}\PitchShift.exe"; Parameters: "--diag"; Comment: "Puts a report about this PC's sound setup on the Desktop"
-Name: "{autodesktop}\Pitch Shift"; Filename: "{app}\PitchShift.exe"
+Name: "{autoprograms}\Swoopy"; Filename: "{app}\Swoopy.exe"
+Name: "{autoprograms}\Swoopy Diagnostics"; Filename: "{app}\Swoopy.exe"; Parameters: "--diag"; Comment: "Puts a report about this PC's sound setup on the Desktop"
+Name: "{autodesktop}\Swoopy"; Filename: "{app}\Swoopy.exe"
 
 [Run]
-; Opens Pitch Shift as the person who started Setup (not as administrator).
-Filename: "{app}\PitchShift.exe"; Description: "Open Pitch Shift"; Flags: nowait postinstall runasoriginaluser; Check: ShouldLaunch
+; Opens Swoopy as the person who started Setup (not as administrator).
+Filename: "{app}\Swoopy.exe"; Description: "Open Swoopy"; Flags: nowait postinstall runasoriginaluser; Check: ShouldLaunch
 
 [UninstallDelete]
 Type: files; Name: "{app}\*.log"
@@ -117,7 +126,7 @@ begin
   Result := not HasParam('/NOLAUNCH');
 end;
 
-// Did Pitch Shift install VB-CABLE? (PitchShiftTool setup-mic writes this down.)
+// Did Swoopy install VB-CABLE? (SwoopyTool setup-mic writes this down.)
 function InstalledCable: Boolean;
 var
   Value: Cardinal;
@@ -125,34 +134,36 @@ begin
   Result := RegQueryDWordValue(HKLM64, 'SOFTWARE\Pitch Shift', 'InstalledByPitchShift', Value) and (Value <> 0);
 end;
 
-// Runs PitchShiftTool with no window and writes what it says into Setup's log.
+// Runs SwoopyTool with no window and writes what it says into Setup's log.
 function RunTool(const Params: String): Integer;
 var
   Code: Integer;
 begin
   Code := -1;
-  if FileExists(ExpandConstant('{app}\PitchShiftTool.exe')) then
+  if FileExists(ExpandConstant('{app}\SwoopyTool.exe')) then
   begin
-    Log('PitchShiftTool ' + Params);
-    if not ExecAndLogOutput(ExpandConstant('{app}\PitchShiftTool.exe'), Params, '', SW_HIDE, ewWaitUntilTerminated, Code, nil) then
+    Log('SwoopyTool ' + Params);
+    if not ExecAndLogOutput(ExpandConstant('{app}\SwoopyTool.exe'), Params, '', SW_HIDE, ewWaitUntilTerminated, Code, nil) then
       Code := -1;
-    Log('PitchShiftTool finished with code ' + IntToStr(Code));
+    Log('SwoopyTool finished with code ' + IntToStr(Code));
   end;
   Result := Code;
 end;
 
-// Closes a running Pitch Shift. It quits cleanly (puts app volumes and the default microphone back);
-// anything still running after that is ended.
+// Closes a running Swoopy (or an older version, named Pitch Shift: both answer the same --quit).
+// It quits cleanly (puts app volumes and the default microphone back); anything still running after that is ended.
 procedure CloseRunningApp;
 var
   Code: Integer;
 begin
-  if FileExists(ExpandConstant('{app}\PitchShift.exe')) then
+  if FileExists(ExpandConstant('{app}\Swoopy.exe')) then
+    Exec(ExpandConstant('{app}\Swoopy.exe'), '--quit', '', SW_HIDE, ewWaitUntilTerminated, Code)
+  else if FileExists(ExpandConstant('{app}\PitchShift.exe')) then
     Exec(ExpandConstant('{app}\PitchShift.exe'), '--quit', '', SW_HIDE, ewWaitUntilTerminated, Code);
-  // The watchdog (PitchShiftTool watch) finishes a few seconds after the app; wait for it, then end leftovers.
+  // The watchdog (SwoopyTool watch) finishes a few seconds after the app; wait for it, then end leftovers.
   Exec(ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe'),
-    '-NoProfile -NonInteractive -Command "Wait-Process -Name PitchShiftTool -Timeout 12 -ErrorAction SilentlyContinue; ' +
-    'Stop-Process -Name PitchShift,PitchShiftTool -Force -ErrorAction SilentlyContinue"',
+    '-NoProfile -NonInteractive -Command "Wait-Process -Name SwoopyTool,PitchShiftTool -Timeout 12 -ErrorAction SilentlyContinue; ' +
+    'Stop-Process -Name Swoopy,SwoopyTool,PitchShift,PitchShiftTool -Force -ErrorAction SilentlyContinue"',
     '', SW_HIDE, ewWaitUntilTerminated, Code);
 end;
 
@@ -162,7 +173,7 @@ begin
   Result := '';
 end;
 
-// Installs VB-CABLE if needed and names it "Pitch Shift Mic" (PitchShiftTool setup-mic).
+// Installs VB-CABLE if needed and names it "Swoopy Mic" (SwoopyTool setup-mic).
 procedure SetUpMic;
 var
   Params: String;
@@ -171,31 +182,45 @@ begin
   Params := 'setup-mic --work "' + ExpandConstant('{tmp}\cable') + '"';
 #if BundleCable
   Params := Params + ' --silent --pack "' + ExpandConstant('{tmp}\{#CablePack}') + '"';
-  WizardForm.StatusLabel.Caption := 'Setting up Pitch Shift Mic (VB-CABLE by VB-Audio)...';
+  WizardForm.StatusLabel.Caption := 'Setting up Swoopy Mic (VB-CABLE by VB-Audio)...';
 #else
   if HasParam('/CABLESILENT') then
     Params := Params + ' --silent';
-  WizardForm.StatusLabel.Caption := 'Setting up Pitch Shift Mic. If VB-Audio''s window opens, click "Install Driver".';
+  WizardForm.StatusLabel.Caption := 'Setting up Swoopy Mic. If VB-Audio''s window opens, click "Install Driver".';
 #endif
   Code := RunTool(Params);
   // 0 = ready, 3010 = installed but Windows needs a restart, 1223 = VB-Audio's window was closed
-  // without installing (no restart; Pitch Shift offers "Repair Pitch Shift Mic").
+  // without installing (no restart; Swoopy offers "Repair Swoopy Mic").
   if Code = 3010 then
     MicNeedsRestart := True
   else if Code = 1223 then
-    SuppressibleMsgBox('Pitch Shift Mic (for your voice in calls) was not installed.' + #13#10#13#10 +
-      'Everything else works. To add it later, open Pitch Shift and click "Repair Pitch Shift Mic".',
+    SuppressibleMsgBox('Swoopy Mic (for your voice in calls) was not installed.' + #13#10#13#10 +
+      'Everything else works. To add it later, open Swoopy and click "Repair Swoopy Mic".',
       mbInformation, MB_OK, IDOK)
   else if Code <> 0 then
-    SuppressibleMsgBox('Pitch Shift Mic (for your voice in calls) could not be set up this time.' + #13#10#13#10 +
-      'Everything else works. To try again later, open Pitch Shift and click "Repair Pitch Shift Mic".',
+    SuppressibleMsgBox('Swoopy Mic (for your voice in calls) could not be set up this time.' + #13#10#13#10 +
+      'Everything else works. To try again later, open Swoopy and click "Repair Swoopy Mic".',
       mbInformation, MB_OK, IDOK);
+end;
+
+// A sign-in repair left by an older version (named Pitch Shift) must run the tool that is there now.
+procedure FixSignInRepair;
+var
+  OldCommand: String;
+begin
+  if RegQueryStringValue(HKCU, 'Software\Microsoft\Windows\CurrentVersion\RunOnce', '!PitchShiftRestore', OldCommand) and
+     (Pos('PitchShiftTool.exe', OldCommand) > 0) then
+    RegWriteStringValue(HKCU, 'Software\Microsoft\Windows\CurrentVersion\RunOnce', '!PitchShiftRestore',
+      '"' + ExpandConstant('{app}\SwoopyTool.exe') + '" restore');
 end;
 
 procedure CurStepChanged(CurStep: TSetupStep);
 begin
   if CurStep = ssPostInstall then
+  begin
+    FixSignInRepair;
     SetUpMic;
+  end;
 end;
 
 function NeedRestart(): Boolean;
@@ -223,7 +248,7 @@ var
 begin
   Form := CreateCustomForm(ScaleX(420), ScaleY(150), False, False);
   try
-    Form.Caption := 'Uninstall Pitch Shift';
+    Form.Caption := 'Uninstall Swoopy';
     Info := TNewStaticText.Create(Form);
     Info.Parent := Form;
     Info.Left := ScaleX(16);
@@ -239,7 +264,7 @@ begin
       CableBox.Top := Y;
       CableBox.Width := Form.ClientWidth - ScaleX(32);
       CableBox.Height := ScaleY(20);
-      CableBox.Caption := 'Pitch Shift Mic (VB-CABLE by VB-Audio)';
+      CableBox.Caption := 'Swoopy Mic (VB-CABLE by VB-Audio)';
       Y := Y + ScaleY(28);
     end;
     SettingsBox := TNewCheckBox.Create(Form);
@@ -248,7 +273,7 @@ begin
     SettingsBox.Top := Y;
     SettingsBox.Width := Form.ClientWidth - ScaleX(32);
     SettingsBox.Height := ScaleY(20);
-    SettingsBox.Caption := 'My Pitch Shift settings';
+    SettingsBox.Caption := 'My Swoopy settings';
     OKButton := TNewButton.Create(Form);
     OKButton.Parent := Form;
     OKButton.Caption := 'Continue';

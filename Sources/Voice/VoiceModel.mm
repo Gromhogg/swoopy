@@ -2,7 +2,7 @@
 // Objective-C++ with ARC. Apple silicon only; Intel Macs keep the stubs at the bottom for good.
 //
 // How the sound flows (live):
-//   sound thread                         worker thread ("Pitch Shift AI voice", user-interactive)
+//   sound thread                         worker thread ("Swoopy AI voice", user-interactive)
 //   push: mic --> ring `in` (chain rate) --> libsamplerate --> ring `in16` (16 kHz)
 //         pitch frames --> ring `pitch`      every hop (H frames of 10 ms) once the window [E-T, E) is there:
 //                                             ContentVec (Core ML) -> features
@@ -1345,7 +1345,7 @@ struct VoiceStream {
 
     static void *threadMain(void *arg) {
         auto *s = (VoiceStream *)arg;
-        pthread_setname_np("Pitch Shift AI voice");
+        pthread_setname_np("Swoopy AI voice");
         while (!s->quit.load()) {
             dispatch_semaphore_wait(s->wake, dispatch_time(DISPATCH_TIME_NOW, 20 * NSEC_PER_MSEC));
             if (s->quit.load()) break;

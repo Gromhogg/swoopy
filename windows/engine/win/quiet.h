@@ -7,7 +7,7 @@
 //   - Windows remembers an app's volume when the app quits, so an app that quit while quiet would
 //     start quiet next time. Apps on the list are fixed as soon as they play again, and their
 //     remembered volume in the registry is put back too.
-//   - While anything is quiet, a "RunOnce" entry runs "PitchShiftTool restore" at the next sign-in.
+//   - While anything is quiet, a "RunOnce" entry runs "SwoopyTool restore" at the next sign-in.
 #pragma once
 #include "win/sessions.h"
 
@@ -64,7 +64,7 @@ void set_restore_at_sign_in(const std::wstring& command);
 // and removes it when nothing does.
 void update_sign_in_safety_net(const std::wstring& command, bool busy = false);
 
-// Keeps a set of sessions quiet while Pitch Shift runs.
+// Keeps a set of sessions quiet while Swoopy runs.
 class QuietKeeper {
 public:
     explicit QuietKeeper(std::wstring list_path, std::wstring restore_command = L"");

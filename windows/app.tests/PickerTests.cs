@@ -45,7 +45,7 @@ public class PickerTests
         Assert.Equal(VoiceAction.Restart, PickerText.Action(fine with { VoiceState = "restart_needed" }, false));
         Assert.Equal(VoiceAction.Repair, PickerText.Action(fine with { VoiceState = "cable_missing" }, false));
         Assert.Equal(VoiceAction.AllowMic, PickerText.Action(fine with { VoiceState = "mic_denied" }, false));
-        Assert.Equal("Repair Pitch Shift Mic", PickerText.ActionTitle(VoiceAction.Repair));
+        Assert.Equal("Repair Swoopy Mic", PickerText.ActionTitle(VoiceAction.Repair));
         Assert.Equal("Restart to finish setup", PickerText.ActionTitle(VoiceAction.Restart));
         Assert.Equal("Allow microphone", PickerText.ActionTitle(VoiceAction.AllowMic));
     }
@@ -69,7 +69,7 @@ public class EngineJsonTests
                   "apps":[{"exe":"C:\\x\\Spotify.exe","running":false,"pid":0},{"exe":"C:\\x\\chrome.exe","running":true,"pid":42}],
                   "speaker":"Speakers (Realtek(R) Audio)","semitones":2.0,"quieted":0},
          "voice":{"state":"running","error":"","in_use":true,"mic":{"id":"m1","name":"Mic"},
-                  "cable":{"present":true,"mic_name":"Pitch Shift Mic","feed_name":"Pitch Shift Mic Feed"},
+                  "cable":{"present":true,"mic_name":"Swoopy Mic","feed_name":"Swoopy Mic Feed"},
                   "semitones":3.0,"natural":true,"test":{"state":"recording","seconds_left":4}}}
         """;
 

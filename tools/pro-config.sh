@@ -1,6 +1,6 @@
 #!/bin/zsh
 # For build.sh: tools/pro-config.sh PUBLIC_KEY ISSUED_FILE OUT
-# Writes OUT, a copy of Sources/ProConfig.swift with Pitch Shift Pro's check data filled in: the public half of the
+# Writes OUT, a copy of Sources/ProConfig.swift with Swoopy Pro's check data filled in: the public half of the
 # owner's signing key pair (64 hex characters), and the fingerprints of the older 25-character keys listed in
 # ISSUED_FILE (issued.txt: "date  name  key" per line), each the SHA-256 of "PSPRO-OLD:" + the key (capitals, no
 # dashes). Must match Sources/Pro.swift (ProKey.oldFingerprint). A missing ISSUED_FILE = no older keys.
@@ -8,7 +8,7 @@
 set -e
 cd "${0:A:h}/.."
 public=$1 issued=$2 out=$3
-[[ $public =~ ^[0-9a-f]{64}$ ]] || { echo "Pitch Shift Pro: the public key must be 64 hex characters (signing-public.txt)" >&2; exit 1; }
+[[ $public =~ ^[0-9a-f]{64}$ ]] || { echo "Swoopy Pro: the public key must be 64 hex characters (signing-public.txt)" >&2; exit 1; }
 [[ -n $out ]] || { echo "Use: tools/pro-config.sh PUBLIC_KEY ISSUED_FILE OUT" >&2; exit 1; }
 fingerprints=()
 if [[ -n $issued && -f $issued ]]; then

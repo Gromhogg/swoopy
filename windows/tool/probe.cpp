@@ -1,4 +1,4 @@
-// probe: decides how Pitch Shift should keep an app's original sound out of the speakers on Windows.
+// probe: decides how Swoopy should keep an app's original sound out of the speakers on Windows.
 //
 // On the Mac, grabbing an app's sound also mutes the original. On Windows it doesn't, and turning the
 // app's volume down also turns down what we grab. The plan ("quiet and boost") is to set the app's
@@ -392,12 +392,12 @@ int Probe::run() {
         const auto q = measure("quiet (via restore list)");
         auto fixer = start_process(self_path(), L"restore --file \"" + restore_file_ + L"\"");
         const bool done = fixer->wait(20000);
-        const auto after = measure("after 'PitchShiftTool restore'", "after_restore");
+        const auto after = measure("after 'SwoopyTool restore'", "after_restore");
         check("restore_by_other_process",
               SUCCEEDED(hr) && listed && q.app.level_db - base.app.level_db < -55 && done &&
                   fixer->exit_code() == 0 && std::fabs(after.app.level_db - base.app.level_db) < 0.2,
               after.app.level_db - base.app.level_db,
-              "a separate 'PitchShiftTool restore' puts the volume back from the list");
+              "a separate 'SwoopyTool restore' puts the volume back from the list");
         info("restore_list_removed", !fs::exists(restore_file_), "the list is deleted after a full restore");
     }
 
@@ -450,7 +450,7 @@ int Probe::run() {
     }
 
     // ---- 12. Quiet, the app quits, and we put the volume back on its closed session before it starts
-    // again (what Pitch Shift would do when it sees a quieted app close). Does the next run start at full?
+    // again (what Swoopy would do when it sees a quieted app close). Does the next run start at full?
     say("12. restore after the app quit");
     {
         session = session_now(tone_->pid());

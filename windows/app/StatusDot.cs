@@ -6,7 +6,7 @@ using System.Windows.Shapes;
 
 namespace PitchShift;
 
-// The dot next to "Pitch Shift Mic": grey, or green with a gentle pulse while a call app is listening
+// The dot next to "Swoopy Mic": grey, or green with a gentle pulse while a call app is listening
 // (a ring grows to 2.4 times its size and fades, every 2 seconds).
 sealed class StatusDot : Grid
 {

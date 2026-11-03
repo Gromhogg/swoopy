@@ -1,21 +1,21 @@
 #!/bin/zsh
-# Builds "Pitch Shift.app" (with the Pitch Shift Mic driver inside) into build/, then installs it in /Applications
+# Builds "Swoopy.app" (with the Swoopy Mic driver inside) into build/, then installs it in /Applications
 # with a shortcut on the Desktop. Use ./build.sh --no-install to only build.
 set -e
 cd "${0:A:h}"
 # Rubber Band and libsamplerate for Apple silicon and Intel (needs brew install rubberband).
 ./libs/build.sh
-app=build/"Pitch Shift.app"
+app=build/Swoopy.app
 rm -rf "$app"
 mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources" "$app/Contents/PlugIns"
 
 ./driver/build.sh
-ditto build/PitchShiftMic.driver "$app/Contents/PlugIns/PitchShiftMic.driver"
+ditto build/SwoopyMic.driver "$app/Contents/PlugIns/SwoopyMic.driver"
 
 # The app is built twice, for Apple silicon (arm64) and Intel (x86_64), both for macOS 14.4 or newer,
 # and joined into one file.
 rm -rf build/obj
-# Pitch Shift Pro: what the app checks keys with. Keys are signed with the owner's private key, which never leaves
+# Swoopy Pro: what the app checks keys with. Keys are signed with the owner's private key, which never leaves
 # ~/Library/Application Support/Pitch Shift Keys; the app gets only the public half (it can check keys, not make
 # them), from PRO_PUBLIC_KEY or else signing-public.txt in that folder (made by tools/pro-keys.sh setup), plus the
 # fingerprints of the older 25-character keys sent out before signed keys, from PRO_ISSUED or else issued.txt in the
@@ -33,9 +33,9 @@ if [[ -n $PRO_PUBLIC_KEY ]]; then
   mkdir -p build/obj
   old_keys=$(tools/pro-config.sh "$PRO_PUBLIC_KEY" "$PRO_ISSUED" build/obj/ProConfig.swift) || exit 1
   swift_sources=(${swift_sources:#Sources/ProConfig.swift} build/obj/ProConfig.swift)
-  echo "Pitch Shift Pro: the paid parts are locked until a key is entered (public key built in; older keys that still work: $old_keys)"
+  echo "Swoopy Pro: the paid parts are locked until a key is entered (public key built in; older keys that still work: $old_keys)"
 else
-  echo "Pitch Shift Pro: no public key, so nothing is locked in this build"
+  echo "Swoopy Pro: no public key, so nothing is locked in this build"
 fi
 for arch in arm64 x86_64; do
   obj=build/obj/$arch
@@ -54,12 +54,12 @@ for arch in arm64 x86_64; do
       -c "$f" -o "$obj/${f:t:r}.o"
   done
   # Rubber Band is built into the app, so the app works on its own. -dead_strip leaves out the code nothing calls.
-  swiftc -target $arch-apple-macos14.4 -O -swift-version 5 $swift_sources $obj/*.o -o $obj/PitchShift \
+  swiftc -target $arch-apple-macos14.4 -O -swift-version 5 $swift_sources $obj/*.o -o $obj/Swoopy \
     -import-objc-header Sources/Bridging.h -Ibuild/libs/include \
     -Xlinker build/libs/lib/librubberband.a -Xlinker build/libs/lib/libsamplerate.a -lc++ -framework Accelerate \
     -framework CoreML -Xlinker -dead_strip
 done
-lipo -create build/obj/arm64/PitchShift build/obj/x86_64/PitchShift -output "$app/Contents/MacOS/PitchShift"
+lipo -create build/obj/arm64/Swoopy build/obj/x86_64/Swoopy -output "$app/Contents/MacOS/Swoopy"
 rm -f build/obj/ProConfig.swift  # the filled-in copy (public key and older keys' fingerprints)
 
 if [[ ! -f AppIcon.icns ]]; then
@@ -100,19 +100,32 @@ codesign --verify --deep --strict "$app"
 echo "Built $app"
 [[ "$1" == "--no-install" ]] && exit 0
 
-# Install here: the app in /Applications, a shortcut on the Desktop (replacing an old real copy there).
-if [[ -e "/Applications/Pitch Shift.app" && ! -w "/Applications/Pitch Shift.app/Contents" ]]; then
-  echo "Pitch Shift in Applications was put there by the installer package. Replace it with:"
-  echo "  packaging/make-pkg.sh 0.0.0-dev && sudo installer -pkg build/PitchShift.pkg -target /"
-  exit 1
-fi
+# Install here: the app in /Applications with a shortcut on the Desktop. An older copy named Pitch Shift (the app and
+# its shortcut) is removed; its mic driver would show up as a second mic, so installing the driver removes it too.
+old_app="/Applications/Pitch Shift.app"
+ours() { [[ $(/usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" "$1/Contents/Info.plist" 2>/dev/null) == local.pitch-shift ]] }
+for a in /Applications/Swoopy.app $old_app; do
+  if [[ -e $a && ! -w $a/Contents ]] && ours $a; then
+    echo "${a:t:r} in Applications was put there by the installer package. Replace it with:"
+    echo "  packaging/make-pkg.sh 0.0.0-dev && sudo installer -pkg build/Swoopy.pkg -target /"
+    exit 1
+  fi
+done
+pkill -x Swoopy && sleep 1 || true
 pkill -x PitchShift && sleep 1 || true
-rm -rf "/Applications/Pitch Shift.app"
-ditto "$app" "/Applications/Pitch Shift.app"
-desktop=~/Desktop/"Pitch Shift.app"
-[[ -e $desktop && ! -L $desktop ]] && rm -rf $desktop
-ln -sfn "/Applications/Pitch Shift.app" $desktop
-if ! cmp -s build/PitchShiftMic.driver/Contents/MacOS/PitchShiftMic /Library/Audio/Plug-Ins/HAL/PitchShiftMic.driver/Contents/MacOS/PitchShiftMic 2>/dev/null; then
-  echo "Pitch Shift Mic is new or changed. Install it with: sudo packaging/install-driver.sh build/PitchShiftMic.driver"
+rm -rf /Applications/Swoopy.app
+ditto "$app" /Applications/Swoopy.app
+if ours $old_app; then rm -rf $old_app; fi
+old_desktop=~/Desktop/"Pitch Shift.app"
+if [[ -L $old_desktop ]]; then
+  if [[ $(readlink $old_desktop) == "$old_app" ]]; then rm $old_desktop; fi
+elif ours $old_desktop; then
+  rm -rf $old_desktop
 fi
-echo "Installed /Applications/Pitch Shift.app (shortcut on the Desktop)"
+desktop=~/Desktop/Swoopy.app
+if [[ ! -e $desktop || -L $desktop ]]; then ln -sfn /Applications/Swoopy.app $desktop; fi
+hal=/Library/Audio/Plug-Ins/HAL
+if [[ -e $hal/PitchShiftMic.driver ]] || ! cmp -s build/SwoopyMic.driver/Contents/MacOS/SwoopyMic $hal/SwoopyMic.driver/Contents/MacOS/SwoopyMic 2>/dev/null; then
+  echo "Swoopy Mic is new or changed. Install it with: sudo packaging/install-driver.sh build/SwoopyMic.driver"
+fi
+echo "Installed /Applications/Swoopy.app (shortcut on the Desktop)"

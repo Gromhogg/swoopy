@@ -1,5 +1,5 @@
-// The engine's C interface (used by the window app through PitchShiftEngine.dll, and by
-// PitchShiftTool's checks, which build the same code in).
+// The engine's C interface (used by the window app through SwoopyEngine.dll, and by
+// SwoopyTool's checks, which build the same code in).
 #include "api/pitchshift_engine.h"
 
 #include "win/apps.h"
@@ -129,7 +129,7 @@ PS_API const char* ps_list_mics_json(void) {
         const std::wstring default_id = VoicePath::default_mic_id();
         const std::wstring cable_mic = find_cable().mic_id;
         for (const auto& e : list_endpoints(eCapture, DEVICE_STATE_ACTIVE)) {
-            // Pitch Shift Mic is where the shifted voice goes, so it can't be a source.
+            // Swoopy Mic is where the shifted voice goes, so it can't be a source.
             if (e.id == cable_mic || (cable_mic.empty() && lower(e.adapter) == L"vb-audio virtual cable")) continue;
             list.push_back({{"id", utf8(e.id)}, {"name", utf8(e.name)}, {"default", e.id == default_id}});
         }

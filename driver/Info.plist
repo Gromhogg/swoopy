@@ -3,10 +3,10 @@
 <plist version="1.0">
 <dict>
 	<key>CFBundleDevelopmentRegion</key><string>English</string>
-	<key>CFBundleExecutable</key><string>PitchShiftMic</string>
+	<key>CFBundleExecutable</key><string>SwoopyMic</string>
 	<key>CFBundleIdentifier</key><string>local.pitch-shift.mic</string>
 	<key>CFBundleInfoDictionaryVersion</key><string>6.0</string>
-	<key>CFBundleName</key><string>PitchShiftMic</string>
+	<key>CFBundleName</key><string>SwoopyMic</string>
 	<key>CFBundlePackageType</key><string>BNDL</string>
 	<key>CFBundleShortVersionString</key><string>2.0.0</string>
 	<key>CFBundleVersion</key><string>2.0.0</string>

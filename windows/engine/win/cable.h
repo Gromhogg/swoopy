@@ -1,6 +1,6 @@
 // The virtual microphone: VB-CABLE by VB-Audio (donationware, vb-cable.com).
-// Whatever plays into its playback side ("Pitch Shift Mic Feed", originally "CABLE Input")
-// comes out of its recording side ("Pitch Shift Mic", originally "CABLE Output"), which people
+// Whatever plays into its playback side ("Swoopy Mic Feed", originally "CABLE Input")
+// comes out of its recording side ("Swoopy Mic", originally "CABLE Output"), which people
 // pick as their microphone in Discord or Zoom.
 #pragma once
 #include "win/com.h"
@@ -11,8 +11,8 @@
 
 namespace ps {
 
-constexpr const wchar_t* kFeedName = L"Pitch Shift Mic Feed";
-constexpr const wchar_t* kMicName = L"Pitch Shift Mic";
+constexpr const wchar_t* kFeedName = L"Swoopy Mic Feed";
+constexpr const wchar_t* kMicName = L"Swoopy Mic";
 constexpr const wchar_t* kSettingsKey = L"SOFTWARE\\Pitch Shift";  // in HKLM, written by setup
 
 struct CableInfo {
@@ -42,11 +42,11 @@ struct SetupOptions {
     bool skip_installer = false;  // checks only: act as if VB-Audio's window was closed without installing
 };
 
-// Installs VB-CABLE if needed, keeps the user's default devices, names the cable "Pitch Shift Mic".
+// Installs VB-CABLE if needed, keeps the user's default devices, names the cable "Swoopy Mic".
 // Returns kSetupReady, kSetupRestart, kSetupNotInstalled, or another number on failure
 // (2 download, 3 wrong file, 4 unpack). Writes progress to `log`.
 int setup_mic(const SetupOptions& options, nlohmann::json& log);
-// Gives the cable back its own names (when Pitch Shift is uninstalled but VB-CABLE stays).
+// Gives the cable back its own names (when Swoopy is uninstalled but VB-CABLE stays).
 int restore_cable_names(nlohmann::json& log);
 // Removes VB-CABLE completely.
 int remove_cable(nlohmann::json& log);

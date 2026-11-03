@@ -1,4 +1,4 @@
-# Pitch Shift for Windows (beta): build and test on GitHub's Windows computers (x64 and ARM64).
+# Swoopy for Windows (beta): build and test on GitHub's Windows computers (x64 and ARM64).
 # There's no Windows PC to test on, so these checks do the listening: recordings (WAV)
 # are uploaded as "artifacts" on each run. (The window app's checks are in windows-app.yml.)
 name: Windows
@@ -72,14 +72,14 @@ jobs:
         run: ctest --test-dir build -C Release --output-on-failure
 
       - name: Rubber Band check (440 Hz shifted +2 should be 493.9 Hz)
-        run: build/out/Release/PitchShiftTool.exe selftest
+        run: build/out/Release/SwoopyTool.exe selftest
 
       # Advanced processing without sound devices: a made-up song shifted with the same code as live, to compare
       # with the Mac app's --render-file on the same file (download the render artifact).
       - name: Advanced processing, offline (a made-up song at +8, -5 and +15)
         if: ${{ !(inputs.repeat > 0) }}
         run: |
-          $tool = 'build/out/Release/PitchShiftTool.exe'
+          $tool = 'build/out/Release/SwoopyTool.exe'
           New-Item -ItemType Directory -Force render-out | Out-Null
           & $tool make-song --out render-out/song.wav --seconds 20
           if ($LASTEXITCODE) { throw 'make-song failed' }
@@ -106,7 +106,7 @@ jobs:
 
       - uses: actions/upload-artifact@v7
         with:
-          name: pitchshift-${{ matrix.arch }}
+          name: swoopy-${{ matrix.arch }}
           path: dist/
 
   probe:
@@ -127,23 +127,23 @@ jobs:
 
       - uses: actions/download-artifact@v8
         with:
-          name: pitchshift-${{ matrix.arch }}
+          name: swoopy-${{ matrix.arch }}
           path: dist
 
       - name: Get sound ready (VB-CABLE, microphone access)
-        run: ./windows/ci/prepare-audio.ps1 -Tool dist/PitchShiftTool.exe
+        run: ./windows/ci/prepare-audio.ps1 -Tool dist/SwoopyTool.exe
 
       - name: Sound setup before
         run: |
           New-Item -ItemType Directory -Force probe-out | Out-Null
-          dist/PitchShiftTool.exe diag | Tee-Object -FilePath probe-out/diag-before.json
+          dist/SwoopyTool.exe diag | Tee-Object -FilePath probe-out/diag-before.json
 
       - name: Probe (how app volume affects app recording)
-        run: dist/PitchShiftTool.exe probe --out probe-out
+        run: dist/SwoopyTool.exe probe --out probe-out
 
       - name: Sound setup after
         if: always()
-        run: dist/PitchShiftTool.exe diag | Tee-Object -FilePath probe-out/diag-after.json
+        run: dist/SwoopyTool.exe diag | Tee-Object -FilePath probe-out/diag-after.json
 
       - name: Summary
         if: always()
@@ -173,30 +173,30 @@ jobs:
 
       - uses: actions/download-artifact@v8
         with:
-          name: pitchshift-${{ matrix.arch }}
+          name: swoopy-${{ matrix.arch }}
           path: dist
 
       - name: Get sound ready (VB-CABLE, microphone access)
-        run: ./windows/ci/prepare-audio.ps1 -Tool dist/PitchShiftTool.exe
+        run: ./windows/ci/prepare-audio.ps1 -Tool dist/SwoopyTool.exe
 
       - name: What you hear (music path)
-        run: dist/PitchShiftTool.exe e2e-music --out e2e-out
+        run: dist/SwoopyTool.exe e2e-music --out e2e-out
 
       - name: What you hear, Advanced processing
         if: always()
-        run: dist/PitchShiftTool.exe e2e-advanced --out e2e-out
+        run: dist/SwoopyTool.exe e2e-advanced --out e2e-out
 
       - name: Your voice (voice path)
         if: always()
-        run: dist/PitchShiftTool.exe e2e-voice --out e2e-out
+        run: dist/SwoopyTool.exe e2e-voice --out e2e-out
 
       - name: Crash recovery
         if: always()
-        run: dist/PitchShiftTool.exe e2e-crash --out e2e-out
+        run: dist/SwoopyTool.exe e2e-crash --out e2e-out
 
       - name: Sound setup after
         if: always()
-        run: dist/PitchShiftTool.exe diag | Tee-Object -FilePath e2e-out/diag-after.json
+        run: dist/SwoopyTool.exe diag | Tee-Object -FilePath e2e-out/diag-after.json
 
       - name: Summary
         if: always()
@@ -227,14 +227,14 @@ jobs:
 
       - uses: actions/download-artifact@v8
         with:
-          name: pitchshift-${{ matrix.arch }}
+          name: swoopy-${{ matrix.arch }}
           path: dist
 
       - name: Get sound ready (VB-CABLE, microphone access)
-        run: ./windows/ci/prepare-audio.ps1 -Tool dist/PitchShiftTool.exe
+        run: ./windows/ci/prepare-audio.ps1 -Tool dist/SwoopyTool.exe
 
       - name: What you hear (music path), ${{ inputs.repeat }} times
-        run: ./windows/ci/repeat-e2e.ps1 -Tool dist/PitchShiftTool.exe -Times ${{ inputs.repeat }} -Out repeat-out -Arch ${{ matrix.arch }} -ExtraArgs '${{ inputs.music_args }}'
+        run: ./windows/ci/repeat-e2e.ps1 -Tool dist/SwoopyTool.exe -Times ${{ inputs.repeat }} -Out repeat-out -Arch ${{ matrix.arch }} -ExtraArgs '${{ inputs.music_args }}'
 
       - uses: actions/upload-artifact@v7
         if: always()
@@ -260,24 +260,24 @@ jobs:
 
       - uses: actions/download-artifact@v8
         with:
-          name: pitchshift-${{ matrix.arch }}
+          name: swoopy-${{ matrix.arch }}
           path: dist
 
       - name: Before (no virtual cable yet)
         run: |
           New-Item -ItemType Directory -Force mic-out | Out-Null
           foreach ($s in 'AudioEndpointBuilder', 'Audiosrv') { Set-Service $s -StartupType Automatic; Start-Service $s }
-          dist/PitchShiftTool.exe diag | Out-File mic-out/diag-before.json -Encoding utf8
+          dist/SwoopyTool.exe diag | Out-File mic-out/diag-before.json -Encoding utf8
 
       - name: Closing VB-Audio's window without installing means "not installed", not "restart"
         run: |
           # A leftover flag from an older version must not make it say "restart" either.
           New-Item -Path 'HKLM:\SOFTWARE\Pitch Shift' -Force | Out-Null
           New-ItemProperty -Path 'HKLM:\SOFTWARE\Pitch Shift' -Name RestartNeeded -Value 1 -PropertyType DWord -Force | Out-Null
-          dist/PitchShiftTool.exe setup-mic --skip-vb-setup | Tee-Object -FilePath mic-out/setup-cancelled.json
+          dist/SwoopyTool.exe setup-mic --skip-vb-setup | Tee-Object -FilePath mic-out/setup-cancelled.json
           $code = $LASTEXITCODE
           $key = Get-ItemProperty -Path 'HKLM:\SOFTWARE\Pitch Shift' -ErrorAction SilentlyContinue
-          $diag = ((dist/PitchShiftTool.exe diag) -join "`n") | ConvertFrom-Json
+          $diag = ((dist/SwoopyTool.exe diag) -join "`n") | ConvertFrom-Json
           Write-Host "exit code $code, RestartNeeded=$($key.RestartNeeded), InstalledByPitchShift=$($key.InstalledByPitchShift), engine restart_needed=$($diag.cable.restart_needed)"
           if ($code -ne 1223) { throw "expected 1223 (not installed), got $code" }
           if ($key.RestartNeeded -eq 1) { throw 'RestartNeeded should not be set' }
@@ -285,22 +285,22 @@ jobs:
           if ($diag.cable.restart_needed) { throw 'the engine should not say "restart needed"' }
           $global:LASTEXITCODE = 0
 
-      - name: Set up Pitch Shift Mic (downloads VB-CABLE, installs it silently, names it)
-        run: dist/PitchShiftTool.exe setup-mic --silent | Tee-Object -FilePath mic-out/setup.json
+      - name: Set up Swoopy Mic (downloads VB-CABLE, installs it silently, names it)
+        run: dist/SwoopyTool.exe setup-mic --silent | Tee-Object -FilePath mic-out/setup.json
 
       - name: Check the names
-        run: ./windows/ci/check-mic-setup.ps1 -Tool dist/PitchShiftTool.exe -Expect named -Out mic-out/diag-named.json
+        run: ./windows/ci/check-mic-setup.ps1 -Tool dist/SwoopyTool.exe -Expect named -Out mic-out/diag-named.json
 
       - name: Give VB-CABLE its own names back
         run: |
-          dist/PitchShiftTool.exe restore-names
-          ./windows/ci/check-mic-setup.ps1 -Tool dist/PitchShiftTool.exe -Expect original -Out mic-out/diag-original.json
+          dist/SwoopyTool.exe restore-names
+          ./windows/ci/check-mic-setup.ps1 -Tool dist/SwoopyTool.exe -Expect original -Out mic-out/diag-original.json
 
       - name: Remove VB-CABLE
         run: |
-          dist/PitchShiftTool.exe remove-cable
+          dist/SwoopyTool.exe remove-cable
           Start-Sleep -Seconds 5
-          ./windows/ci/check-mic-setup.ps1 -Tool dist/PitchShiftTool.exe -Expect removed -Out mic-out/diag-removed.json
+          ./windows/ci/check-mic-setup.ps1 -Tool dist/SwoopyTool.exe -Expect removed -Out mic-out/diag-removed.json
 
       - uses: actions/upload-artifact@v7
         if: always()

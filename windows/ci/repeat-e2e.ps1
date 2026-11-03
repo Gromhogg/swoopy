@@ -24,7 +24,7 @@ for ($i = 1; $i -le $Times; $i++) {
     $code = $LASTEXITCODE
     Write-Host '::endgroup::'
     # A run that stopped early could leave test players playing; they would spoil the next run.
-    Get-Process PitchShiftTool, FakePlayer -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+    Get-Process SwoopyTool, FakePlayer -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
     $fails = @()
     $hiccups = $false  # a listening window with a hiccup in it (its recordings are worth keeping)
     $report = Join-Path $folder 'e2e_music.json'

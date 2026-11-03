@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <!-- The Pitch Shift window (WPF). Build one self-contained .exe per processor type:
-         dotnet publish windows/app -c Release -r win-x64   -p:EngineDir=<folder with PitchShiftEngine.dll>
+  <!-- The Swoopy window (WPF). Build one self-contained .exe per processor type:
+         dotnet publish windows/app -c Release -r win-x64   -p:EngineDir=<folder with SwoopyEngine.dll>
          dotnet publish windows/app -c Release -r win-arm64 -p:EngineDir=... -->
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
@@ -11,14 +11,14 @@
     <UseWindowsForms>true</UseWindowsForms>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <AssemblyName>PitchShift</AssemblyName>
+    <AssemblyName>Swoopy</AssemblyName>
     <RootNamespace>PitchShift</RootNamespace>
     <ApplicationIcon>AppIcon.ico</ApplicationIcon>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <Version>2.0.0</Version>
     <InformationalVersion>2.0.0-beta</InformationalVersion>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
-    <Product>Pitch Shift</Product>
+    <Product>Swoopy</Product>
     <Copyright>GPL-3.0-or-later</Copyright>
     <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
     <!-- WPF0001: the Fluent (Windows 11) look is still marked "experimental". WFO0003: the DPI setting
@@ -45,9 +45,9 @@
     <Resource Include="AppIcon.ico" />
   </ItemGroup>
 
-  <!-- The sound engine (built with CMake) sits next to PitchShift.exe. -->
+  <!-- The sound engine (built with CMake) sits next to Swoopy.exe. -->
   <ItemGroup Condition="'$(EngineDir)' != ''">
-    <None Include="$(EngineDir)\PitchShiftEngine.dll" Link="PitchShiftEngine.dll"
+    <None Include="$(EngineDir)\SwoopyEngine.dll" Link="SwoopyEngine.dll"
           CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest"
           ExcludeFromSingleFile="true" />
   </ItemGroup>

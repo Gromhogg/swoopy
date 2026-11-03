@@ -1,4 +1,4 @@
-// The Soundboard: sound effects (files the owner adds) that play into "Pitch Shift Mic", so the people in a call
+// The Soundboard: sound effects (files the owner adds) that play into "Swoopy Mic", so the people in a call
 // hear them. They're mixed in after the voice (never through the mic or the pitch change, see VoiceChain), and the
 // owner hears them too, on the Mac's current speakers or headphones. On the Mac's own speakers the mic is muted
 // while a sound plays (and 150 ms after), so the mic can't pick the sound up and send it a second time (an echo).
@@ -70,7 +70,7 @@ final class SoundClip {
 
         // Loudest point at -6 dBFS, so every sound is about as loud and there's room for the voice. The loudest point
         // counts the points between samples: a hard-edged (clipped) sound swings up to ~5 dB past its samples there,
-        // and the clock matching into Pitch Shift Mic (and the call app) turn those points into samples.
+        // and the clock matching into Swoopy Mic (and the call app) turn those points into samples.
         let data = result.floatChannelData![0]
         let total = Int(result.frameLength)
         var loudest: Float = 0
@@ -964,7 +964,7 @@ final class SoundboardPanel: NSObject, NSWindowDelegate, NSPopoverDelegate {
 
 // MARK: Checks (--test-sounds, --render-sounds)
 
-// Offline check (--render-sounds): what Pitch Shift Mic would send while the Soundboard plays over a voice, made with
+// Offline check (--render-sounds): what Swoopy Mic would send while the Soundboard plays over a voice, made with
 // the voice chain's own mixing (CallMix) in callbacks of `buffer` samples, with no devices. `voice` is one channel at
 // `rate` (already shifted if wanted; `shifted`: it went through the pitch change, which the chain eases at its
 // loudest). Each start is a click on the sound; like the app, the sound is cleared 0.1 s after its end, unless the
@@ -1079,7 +1079,7 @@ func similarity(_ recording: [Float], _ reference: [Float]) -> [Float] {
     }
 }
 
-// The --test-sounds report: where and how loud the sound arrived in Pitch Shift Mic, whether there's a second copy
+// The --test-sounds report: where and how loud the sound arrived in Swoopy Mic, whether there's a second copy
 // of it (an echo), and how loud the voice (a steady tone) was before, while and after the sound played.
 func soundTestReport(recorded: [Float], reference: [Float], rate: Double, toneHz: Double) -> [String] {
     let m = reference.count
@@ -1102,7 +1102,7 @@ func soundTestReport(recorded: [Float], reference: [Float], rate: Double, toneHz
     let ownSecond = own.indices.filter { $0 > 5 * ms }.map { abs(own[$0]) }.max() ?? 0
 
     // How loud it arrived, compared with the file (1 = -6 dBFS at its loudest point), half a second at a time. Each
-    // half second is lined up on its own: Pitch Shift Mic's clock drifts a few samples from the mic's over a long sound.
+    // half second is lined up on its own: Swoopy Mic's clock drifts a few samples from the mic's over a long sound.
     struct Piece { let at: Int, count: Int, lag: Int, gain: Float }
     var pieces: [Piece] = []
     let half = Int(rate / 2)
@@ -1128,7 +1128,7 @@ func soundTestReport(recorded: [Float], reference: [Float], rate: Double, toneHz
     let level = heard.isEmpty ? 0 : Double(heard[heard.count / 2])
     let start = Double(best) / rate, end = Double(best + m) / rate
     let peakDB = 20 * log10(max(1e-9, level * Double(SoundClip.peak)))
-    lines.append(String(format: "  sound in Pitch Shift Mic from %.3f s to %.3f s, level %.3f x the file (loudest point %.1f dBFS)",
+    lines.append(String(format: "  sound in Swoopy Mic from %.3f s to %.3f s, level %.3f x the file (loudest point %.1f dBFS)",
                         start, end, level, peakDB))
     lines.append(String(format: "  each half second: %.3f to %.3f x, the last one %.3f x; timing drift by the end %d samples",
                         heard.first ?? 0, heard.last ?? 0, pieces.last?.gain ?? 0, pieces.last?.lag ?? 0))

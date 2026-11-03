@@ -1,16 +1,26 @@
 #!/bin/bash
-# Runs as admin after Pitch Shift is copied to /Applications: installs Pitch Shift Mic, puts a shortcut on the
-# Desktop of whoever is logged in, and opens the app.
-app="/Applications/Pitch Shift.app"
-"$app/Contents/Resources/install-driver.sh" || echo "Pitch Shift Mic could not be installed"
+# Runs as admin after Swoopy is copied to /Applications: removes an older copy named Pitch Shift, installs Swoopy Mic,
+# puts a shortcut on the Desktop of whoever is logged in, and opens the app.
+app="/Applications/Swoopy.app"
+old_app="/Applications/Pitch Shift.app"
+ours() { [ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$1/Contents/Info.plist" 2>/dev/null)" = local.pitch-shift ]; }
+if ours "$old_app"; then rm -rf "$old_app"; fi
+"$app/Contents/Resources/install-driver.sh" || echo "Swoopy Mic could not be installed"
 xattr -dr com.apple.quarantine "$app" 2>/dev/null
 
 user=$(stat -f %Su /dev/console)
 if [ -n "$user" ] && [ "$user" != "root" ] && [ "$user" != "loginwindow" ]; then
   uid=$(id -u "$user")
   home=$(dscl . -read "/Users/$user" NFSHomeDirectory | awk '{print $2}')
-  # A shortcut on the Desktop. macOS privacy rules may block this from an installer; install.sh also makes it.
-  desktop="$home/Desktop/Pitch Shift.app"
+  # A shortcut on the Desktop, in place of an older one. macOS privacy rules may block this from an installer;
+  # install.sh also does it.
+  old="$home/Desktop/Pitch Shift.app"
+  if [ -L "$old" ]; then
+    if [ "$(readlink "$old")" = "$old_app" ]; then launchctl asuser "$uid" sudo -u "$user" rm -f "$old" 2>/dev/null; fi
+  elif ours "$old"; then
+    launchctl asuser "$uid" sudo -u "$user" rm -rf "$old" 2>/dev/null
+  fi
+  desktop="$home/Desktop/Swoopy.app"
   if [ ! -e "$desktop" ] || [ -L "$desktop" ]; then
     launchctl asuser "$uid" sudo -u "$user" ln -sfn "$app" "$desktop" 2>/dev/null
   fi

@@ -74,12 +74,12 @@ final class GradientSwitch: NSView {
         }
     }
     var looksEnabled: Bool { isEnabled && !dimmed }
-    // Pitch Shift Pro is locked: dimmed, and a click only calls onLockedClick (which opens the unlock window).
+    // Swoopy Pro is locked: dimmed, and a click only calls onLockedClick (which opens the unlock window).
     var locked = false {
         didSet {
             guard oldValue != locked else { return }
             needsDisplay = true
-            toolTip = locked ? "Pitch Shift Pro" : nil
+            toolTip = locked ? "Swoopy Pro" : nil
             onLocked(locked)
         }
     }
@@ -289,14 +289,14 @@ final class GradientSlider: NSView {
             needsDisplay = true
         }
     }
-    // Pitch Shift Pro is locked: dimmed with a small lock under the middle, and a click only calls onLockedClick
+    // Swoopy Pro is locked: dimmed with a small lock under the middle, and a click only calls onLockedClick
     // (which opens the unlock window).
     var locked = false {
         didSet {
             guard oldValue != locked else { return }
             if locked && window?.firstResponder === self { window?.makeFirstResponder(nil) }
-            toolTip = locked ? "Pitch Shift Pro" : nil
-            setAccessibilityHelp(locked ? "Pitch Shift Pro" : nil)
+            toolTip = locked ? "Swoopy Pro" : nil
+            setAccessibilityHelp(locked ? "Swoopy Pro" : nil)
             needsDisplay = true
         }
     }
@@ -419,7 +419,7 @@ final class GradientSlider: NSView {
     // picked each time it's drawn, so it follows light and dark mode; `color` fixes it instead (for a button's title).
     static func lockImage(size: CGFloat, color: NSColor? = nil) -> NSImage? {
         let config = NSImage.SymbolConfiguration(pointSize: size, weight: .semibold)
-        guard let symbol = NSImage(systemSymbolName: "lock.fill", accessibilityDescription: "Pitch Shift Pro")?
+        guard let symbol = NSImage(systemSymbolName: "lock.fill", accessibilityDescription: "Swoopy Pro")?
             .withSymbolConfiguration(config) else { return nil }
         let image = NSImage(size: symbol.size, flipped: false) { rect in
             symbol.draw(in: rect)
@@ -428,7 +428,7 @@ final class GradientSlider: NSView {
             return true
         }
         image.cacheMode = .never
-        image.accessibilityDescription = "Pitch Shift Pro"
+        image.accessibilityDescription = "Swoopy Pro"
         return image
     }
 
@@ -1064,7 +1064,7 @@ final class BackgroundView: NSView {
     override func mouseDown(with event: NSEvent) { window?.makeFirstResponder(nil) }
 }
 
-// The dot next to "Pitch Shift Mic": grey, or green with a gentle pulse while a call app is listening.
+// The dot next to "Swoopy Mic": grey, or green with a gentle pulse while a call app is listening.
 final class StatusDot: NSView {
     var isLive = false { didSet { if oldValue != isLive { update() } } }
     private let dot = CALayer()
@@ -1144,14 +1144,14 @@ final class CardRow: NSStackView {
     var onScale: (CGFloat) -> Void = { _ in }
 }
 
-// A card's picker. While Pitch Shift Pro is locked (the Voice changer's voices) it's greyed out, and a click only calls
+// A card's picker. While Swoopy Pro is locked (the Voice changer's voices) it's greyed out, and a click only calls
 // onLockedClick (which opens the unlock window).
 final class CardPicker: NSPopUpButton {
     var locked = false {
         didSet {
             guard oldValue != locked else { return }
-            toolTip = locked ? "Pitch Shift Pro" : nil
-            setAccessibilityHelp(locked ? "Pitch Shift Pro" : nil)
+            toolTip = locked ? "Swoopy Pro" : nil
+            setAccessibilityHelp(locked ? "Swoopy Pro" : nil)
         }
     }
     var onLockedClick: () -> Void = {}
@@ -1179,7 +1179,7 @@ final class ShiftCard: NSView {
     let plus = NSButton()
     let picker = CardPicker(frame: .zero, pullsDown: false)
     let showsAmount: Bool
-    // Pitch Shift Pro is locked (the Voice changer card): the switch and the picker are locked (see GradientSwitch and
+    // Swoopy Pro is locked (the Voice changer card): the switch and the picker are locked (see GradientSwitch and
     // CardPicker), and a small lock shows after the title.
     var locked = false {
         didSet {
@@ -1217,7 +1217,7 @@ final class ShiftCard: NSView {
     private var accessoryScale: ((CGFloat) -> Void)?  // sizes the views next to the picker (addPickerAccessory)
     var keepsLook: [NSView] = []  // rows that look the same while the card is off (they don't belong to its switch)
 
-    // The title, with a small lock after it while Pitch Shift Pro is locked.
+    // The title, with a small lock after it while Swoopy Pro is locked.
     private func showTitle() {
         guard locked, let font = title.font, let lock = GradientSlider.lockImage(size: font.pointSize - 2) else {
             title.stringValue = titleText
@@ -1230,7 +1230,7 @@ final class ShiftCard: NSView {
         attachment.bounds = NSRect(x: 0, y: ((font.capHeight - lock.size.height) / 2).rounded(), width: lock.size.width, height: lock.size.height)
         words.append(NSAttributedString(attachment: attachment))
         title.attributedStringValue = words
-        title.toolTip = "Pitch Shift Pro"
+        title.toolTip = "Swoopy Pro"
     }
     private let titleText: String
 
@@ -1325,11 +1325,11 @@ final class ShiftCard: NSView {
 
     // A row with a label on the left and a small switch on the right, for settings like "Advanced processing".
     // The label dims while the switch can't be used. `notes`: small views right after the label (shown when needed).
-    // While Pitch Shift Pro is locked, the label dims and gets a small lock after it.
+    // While Swoopy Pro is locked, the label dims and gets a small lock after it.
     static func switchRow(_ text: String, _ toggle: GradientSwitch, notes: [NSView] = []) -> CardRow {
         let label = NSTextField(labelWithString: text)
         func show() {
-            label.toolTip = toggle.locked ? "Pitch Shift Pro" : nil
+            label.toolTip = toggle.locked ? "Swoopy Pro" : nil
             guard toggle.locked, let font = label.font, let lock = GradientSlider.lockImage(size: font.pointSize - 2) else {
                 if label.stringValue != text { label.stringValue = text }
                 label.textColor = toggle.looksEnabled && !toggle.locked ? .secondaryLabelColor : .tertiaryLabelColor
@@ -1552,7 +1552,7 @@ enum Keys {
 
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWindowDelegate {
     let defaults = UserDefaults.standard
-    // While Pitch Shift Pro is locked, the paid settings use the free version's values (Free); what's saved is kept.
+    // While Swoopy Pro is locked, the paid settings use the free version's values (Free); what's saved is kept.
     lazy var hear = HearShifter(
         halfSteps: defaults.object(forKey: Keys.halfSteps) as? Float ?? 2,
         source: HearSource(saved: defaults.string(forKey: Keys.hearSource) ?? defaults.string(forKey: "source")),
@@ -1566,7 +1566,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         fastHigher: Pro.shared.unlocked ? AppDelegate.savedFastHigher(defaults) : Free.fastHigher,
         micUID: defaults.string(forKey: Keys.voiceMic))
     lazy var test = VoiceTest(voice: voice)
-    // Sound effects into Pitch Shift Mic. Pictures show example names and change nothing.
+    // Sound effects into Swoopy Mic. Pictures show example names and change nothing.
     lazy var board = Soundboard(voice: voice, sounds: preview == nil ? Soundboard.saved(defaults) : Soundboard.examples,
                                 saves: preview == nil)
     lazy var soundboard = SoundboardPanel(board: board)
@@ -1609,7 +1609,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
     // same settings with the card's switch off; changer-quiet-on: "Block background sounds" on (3.5).
     func restoreChanger() {
         if let preview {
-            // (off while Pitch Shift Pro is locked)
+            // (off while Swoopy Pro is locked)
             voice.changer.on = preview.contains("changer") && !preview.contains("changer-card-off") && Pro.shared.unlocked
             voice.changer.voiceID = arg("--voice").flatMap { VoiceLibrary.shared.voice($0)?.id }
                 ?? (preview.contains("changer-man") ? "man" : "woman")  // --voice NAME: that voice (an added one too)
@@ -1632,7 +1632,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
             previewVoice = preview.contains("voice-on") && !voice.changer.on  // only one at a time: the changer wins
             return
         }
-        // The Voice changer is part of Pitch Shift Pro: off while it's locked (what was saved is kept for later).
+        // The Voice changer is part of Swoopy Pro: off while it's locked (what was saved is kept for later).
         voice.changer.on = defaults.bool(forKey: Keys.changerOn) && Pro.shared.unlocked
         // A voice that was removed: Woman is used, and the saved choice is kept.
         let saved = defaults.string(forKey: Keys.changerVoice) ?? "woman"
@@ -1725,10 +1725,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
     let testButton = NSButton(title: "Test", target: nil, action: nil)
     let soundsButton = NSButton(title: "Sounds", target: nil, action: nil)  // opens the Soundboard
     let dot = StatusDot()
-    let micName = NSTextField(labelWithString: "Pitch Shift Mic")
-    let installButton = NSButton(title: "Install Pitch Shift Mic", target: nil, action: nil)
+    let micName = NSTextField(labelWithString: "Swoopy Mic")
+    let installButton = NSButton(title: "Install Swoopy Mic", target: nil, action: nil)
     var footer: CardRow!
-    // "Unlock Pro" in the title bar while Pitch Shift Pro is locked.
+    // "Unlock Pro" in the title bar while Swoopy Pro is locked.
     let unlockButton = NSButton(title: "Unlock Pro", target: nil, action: nil)
     let unlockAccessory = NSTitlebarAccessoryViewController()
     private var soundsSize: NSControl.ControlSize = .regular
@@ -1821,15 +1821,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
             item.submenu = menu
             main.addItem(item)
         }
-        // "Unlock Pitch Shift Pro…" (or "Pitch Shift Pro…" once unlocked) only in builds with the server set up.
+        // "Unlock Swoopy Pro…" (or "Swoopy Pro…" once unlocked) only in builds with the server set up.
         let pro: [(String, Selector, String, NSEvent.ModifierFlags)] = Pro.shared.enabled
-            ? [(Pro.shared.unlocked ? "Pitch Shift Pro…" : "Unlock Pitch Shift Pro…", #selector(showUnlock), "", []),
+            ? [(Pro.shared.unlocked ? "Swoopy Pro…" : "Unlock Swoopy Pro…", #selector(showUnlock), "", []),
                ("-", #selector(showUnlock), "", [])]
             : []
-        submenu("Pitch Shift", pro + [
-            ("Hide Pitch Shift", #selector(NSApplication.hide(_:)), "h", .command),
+        submenu("Swoopy", pro + [
+            ("Hide Swoopy", #selector(NSApplication.hide(_:)), "h", .command),
             ("-", #selector(NSApplication.hide(_:)), "", []),
-            ("Quit Pitch Shift", #selector(NSApplication.terminate(_:)), "q", .command),
+            ("Quit Swoopy", #selector(NSApplication.terminate(_:)), "q", .command),
         ])
         submenu("Edit", [
             ("Undo", Selector(("undo:")), "z", .command),
@@ -1867,7 +1867,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         // Its tone, Bass ... Treble, kept for each speakers or headphones.
         tone.mark = 0.5
         tone.onChange = { [weak self] value in self?.tonePicked(value) }
-        // Locked controls (Pitch Shift Pro) only open the unlock window.
+        // Locked controls (Swoopy Pro) only open the unlock window.
         for slider in [tone, style, strength, realism, fastSlider] { slider.onLockedClick = { [weak self] in self?.showUnlock() } }
         for toggle in [slowSwitch, autoEQSwitch] { toggle.onLockedClick = { [weak self] in self?.showUnlock() } }
         let toneRow = CardRow(views: [tone])
@@ -1953,7 +1953,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         voiceCard = ShiftCard(title: "Input pitch shifter", extraRows: [styleRow, slowRow])
         voiceCard.addRow(fastRow, tight: true)
         voiceCard.addRow(footer)
-        voiceCard.keepsLook = [footer]  // Pitch Shift Mic and the Soundboard work whether the voice is on or off
+        voiceCard.keepsLook = [footer]  // Swoopy Mic and the Soundboard work whether the voice is on or off
         voiceCard.picker.menu?.delegate = self
         voiceCard.picker.target = self
         voiceCard.picker.action = #selector(micPicked)
@@ -2012,7 +2012,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         changerCard.picker.setAccessibilityLabel("Voice")
         changerCard.onToggle = { [weak self] on in self?.setChanger(on) }
         changerCard.addPickerAccessory(voiceTools.views) { [unowned self] scale in voiceTools.size(for: scale) }
-        // Locked (Pitch Shift Pro): its switch and voice picker only open the unlock window.
+        // Locked (Swoopy Pro): its switch and voice picker only open the unlock window.
         changerCard.toggle.onLockedClick = { [weak self] in self?.showUnlock() }
         changerCard.picker.onLockedClick = { [weak self] in self?.showUnlock() }
 
@@ -2033,7 +2033,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
 
         window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 588, height: 300),
                           styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
-        window.title = "Pitch Shift"
+        window.title = "Swoopy"
         window.isReleasedWhenClosed = false
         window.collectionBehavior = [.fullScreenNone]
         window.autorecalculatesKeyViewLoop = false
@@ -2056,7 +2056,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         buildUnlockButton()
     }
 
-    // "Unlock Pro" at the right end of the title bar, shown only while Pitch Shift Pro is locked.
+    // "Unlock Pro" at the right end of the title bar, shown only while Swoopy Pro is locked.
     private func buildUnlockButton() {
         unlockButton.bezelStyle = .rounded
         unlockButton.controlSize = .small
@@ -2065,7 +2065,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
             .foregroundColor: Theme.mid, .font: NSFont.systemFont(ofSize: NSFont.smallSystemFontSize, weight: .semibold)])
         unlockButton.target = self
         unlockButton.action = #selector(showUnlock)
-        unlockButton.toolTip = "Pitch Shift Pro"
+        unlockButton.toolTip = "Swoopy Pro"
         unlockButton.sizeToFit()
         let holder = NSView(frame: NSRect(x: 0, y: 0, width: unlockButton.frame.width + 10, height: unlockButton.frame.height))
         unlockButton.frame.origin = .zero
@@ -2089,7 +2089,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         }
     }
 
-    // The Sounds button: in the middle color, or dimmed with a small lock while Pitch Shift Pro is locked.
+    // The Sounds button: in the middle color, or dimmed with a small lock while Swoopy Pro is locked.
     private func styleSounds() {
         let locked = !Pro.shared.unlocked
         let font = NSFont.systemFont(ofSize: Theme.fontSize(soundsSize), weight: .medium)
@@ -2108,10 +2108,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
             title.insert(NSAttributedString(attachment: attachment), at: 0)
         }
         soundsButton.attributedTitle = title
-        soundsButton.toolTip = locked ? "Pitch Shift Pro" : nil
+        soundsButton.toolTip = locked ? "Swoopy Pro" : nil
     }
 
-    // MARK: Pitch Shift Pro
+    // MARK: Swoopy Pro
 
     @objc func showUnlock() {
         guard Pro.shared.enabled else { return }
@@ -2592,14 +2592,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         testAlone = false
         voice.stop()
         // The Soundboard opened or closed during the test (it leaves the default mic alone while the voice runs):
-        // Pitch Shift Mic is the default mic only while something still runs.
+        // Swoopy Mic is the default mic only while something still runs.
         if testSounds && !voice.runsForSounds && voice.state == .off { DefaultMic.giveBack() }
         if !testSounds && voice.runsForSounds { DefaultMic.takeOver() }
     }
 
     // Opens the Soundboard next to the window, or closes it.
     @objc func soundsClicked() {
-        guard Pro.shared.unlocked else { showUnlock(); return }  // the Soundboard is part of Pitch Shift Pro
+        guard Pro.shared.unlocked else { showUnlock(); return }  // the Soundboard is part of Swoopy Pro
         if soundboard.isOpen {
             soundboard.close()
             return
@@ -2607,7 +2607,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         soundboard.open(beside: window)
         guard preview == nil else { return }  // pictures change nothing
         // Sounds go out through the voice chain, so with Your voice and the Voice changer off it runs as if the voice
-        // were on with no pitch change, and Pitch Shift Mic becomes the Mac's default mic (like turning the voice on).
+        // were on with no pitch change, and Swoopy Mic becomes the Mac's default mic (like turning the voice on).
         soundsOff?.cancel()
         soundsOff = nil
         voice.keepForSounds(true)
@@ -2674,7 +2674,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
 
     // MARK: Voice changer
 
-    // On its own, the Voice changer runs the mic like Your voice does: Pitch Shift Mic gets the changed voice and
+    // On its own, the Voice changer runs the mic like Your voice does: Swoopy Mic gets the changed voice and
     // becomes the Mac's default mic. Only one at a time: turning it on turns Your voice off, and turning Your voice on
     // turns it off; the card that goes off keeps all its settings.
     func setChanger(_ on: Bool) {
@@ -2765,7 +2765,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
 
     // MARK: Switches
 
-    // Pictures (--preview) play nothing and save nothing, even if a switch or Test gets pressed: they show Pitch Shift
+    // Pictures (--preview) play nothing and save nothing, even if a switch or Test gets pressed: they show Swoopy
     // Pro unlocked whatever the key, so they must never start any sound.
     func setHear(_ on: Bool) {
         guard preview == nil else { refresh(); return }
@@ -2817,11 +2817,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone")!)
     }
 
-    // Installs the Pitch Shift Mic driver (asks for the Mac password), for copies installed without the package.
+    // Installs the Swoopy Mic driver (asks for the Mac password), for copies installed without the package.
     @objc func installDriver() {
         guard let script = Bundle.main.path(forResource: "install-driver", ofType: "sh") else { NSSound.beep(); return }
         let command = "/bin/bash '\(script)'"
-        let source = "do shell script \"\(command)\" with prompt \"Pitch Shift needs your password to add Pitch Shift Mic.\" with administrator privileges"
+        let source = "do shell script \"\(command)\" with prompt \"Swoopy needs your password to add Swoopy Mic.\" with administrator privileges"
         var error: NSDictionary?
         NSAppleScript(source: source)?.executeAndReturnError(&error)
         guard error == nil else { return }
@@ -2852,7 +2852,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
     // changer state, Your voice shows off (only one at a time).
     func showPreview() {
         guard let preview else { return }
-        // With Pitch Shift Pro locked (pro-locked, pro-unlock), the paid controls keep the free version's values.
+        // With Swoopy Pro locked (pro-locked, pro-unlock), the paid controls keep the free version's values.
         let pro = Pro.shared.unlocked
         if preview.contains("light") {
             window.appearance = NSAppearance(named: .aqua)
@@ -2952,7 +2952,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
 
     private var driverInstalled: Bool { Mics.driverInstalled && preview?.contains("no-driver") != true }
 
-    // Shows "Pitch Shift Mic" or the Install button, and resizes the window's limits when that changes.
+    // Shows "Swoopy Mic" or the Install button, and resizes the window's limits when that changes.
     private func showDriverState() {
         let now = driverInstalled
         guard now != installed else { return }
@@ -2980,7 +2980,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         let waiting = preview.map { $0.contains("waiting") } ?? (hear.state == .waiting)
         hearCard.show(on: hearOn, value: hear.halfSteps, active: hearOn, waiting: waiting)
         if advancedAlert == nil { advancedSwitch.isOn = hear.advanced }  // stays on while the alert asks
-        // Pitch Shift Pro: locked controls show the free version's value, dimmed with a small lock.
+        // Swoopy Pro: locked controls show the free version's value, dimmed with a small lock.
         let locked = !Pro.shared.unlocked
         tone.locked = locked
         style.locked = locked
@@ -2988,8 +2988,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         fastSlider.locked = locked
         tone.value = (((hear.tones[outputUID] ?? 0) + 1) / 2 * 100).rounded() / 100
         tone.isEnabled = hear.advanced
-        tone.toolTip = locked ? "Pitch Shift Pro" : outputName.isEmpty ? nil : "For \(outputName)"
-        // Auto EQ: off while Pitch Shift Pro is locked (its sliders show only while it's on).
+        tone.toolTip = locked ? "Swoopy Pro" : outputName.isEmpty ? nil : "For \(outputName)"
+        // Auto EQ: off while Swoopy Pro is locked (its sliders show only while it's on).
         autoEQSwitch.locked = locked
         let eq = hear.autoEQ(for: outputUID)
         autoEQSwitch.isOn = eq.on
@@ -3020,23 +3020,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         if hasMic { showCurrentMic() }
         style.value = voice.cartoon
         style.isEnabled = installed
-        style.toolTip = locked ? "Pitch Shift Pro" : nil
+        style.toolTip = locked ? "Swoopy Pro" : nil
         slowSwitch.isOn = voice.slowDeeper
         slowSwitch.isEnabled = installed
-        slowSwitch.toolTip = locked ? "Pitch Shift Pro" : nil
+        slowSwitch.toolTip = locked ? "Swoopy Pro" : nil
         // Higher when fast works only with Deeper when slow on (so never with the Voice changer: only one at a time).
         fastSlider.value = voice.fastHigher / SpeakingRate.maxUp
         fastSlider.isEnabled = installed && voice.slowDeeper
         fastLabel.textColor = fastSlider.isEnabled && !locked ? .secondaryLabelColor : .tertiaryLabelColor
-        fastLabel.toolTip = locked ? "Pitch Shift Pro" : nil
+        fastLabel.toolTip = locked ? "Swoopy Pro" : nil
         soundsButton.isEnabled = installed && hasMic  // the Soundboard works with the voice off too
         if case .problem(let message) = voice.state { voiceCard.amount.toolTip = message } else { voiceCard.amount.toolTip = nil }
         showChanger(active: changerActive, usable: installed && hasMic, locked: locked)
 
         let listening = preview.map { $0.contains("listening") } ?? voice.listening
         dot.isLive = (voiceOn || voice.changer.on || voice.runsForSounds) && installed && listening
-        footer.toolTip = dot.isLive ? "An app is using Pitch Shift Mic" : "Choose Pitch Shift Mic as the microphone in Discord, Zoom or any app"
-        micName.setAccessibilityValue(dot.isLive ? "Pitch Shift Mic, in use" : "Pitch Shift Mic, not in use")
+        footer.toolTip = dot.isLive ? "An app is using Swoopy Mic" : "Choose Swoopy Mic as the microphone in Discord, Zoom or any app"
+        micName.setAccessibilityValue(dot.isLive ? "Swoopy Mic, in use" : "Swoopy Mic, not in use")
 
         var phase = test.phase
         if let preview, preview.contains("recording") { phase = .recording(3) }
@@ -3065,9 +3065,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
     }
 
     // The Voice changer card: on while its switch is on (`active`); the switch and picker work while
-    // Pitch Shift Mic and a mic are there (`usable`). Under "Faster ↔ More real": the delay, a spinner while the
+    // Swoopy Mic and a mic are there (`usable`). Under "Faster ↔ More real": the delay, a spinner while the
     // realistic voice gets ready, a small warning sign when Natural is standing in (the tooltip says why). While
-    // Pitch Shift Pro is locked (`locked`), it's off and everything in it shows a lock and opens the unlock window.
+    // Swoopy Pro is locked (`locked`), it's off and everything in it shows a lock and opens the unlock window.
     private func showChanger(active: Bool, usable: Bool, locked: Bool) {
         changerCard.locked = locked
         strength.locked = locked
@@ -3144,7 +3144,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
             if loading { realisticLoading.startAnimation(nil) } else { realisticLoading.stopAnimation(nil) }
         }
         realisticWarning.isHidden = !warning
-        if locked { note = "Pitch Shift Pro" }
+        if locked { note = "Swoopy Pro" }
         realism.toolTip = note
         delayRow.toolTip = note
         realism.setAccessibilityHelp(note)
@@ -3157,7 +3157,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         secondSwitch.locked = locked
         secondSwitch.isOn = voice.changer.second
         secondSwitch.isEnabled = active && has && realisticOffered && voice.changer.realistic
-        secondSwitch.toolTip = locked ? "Pitch Shift Pro"
+        secondSwitch.toolTip = locked ? "Swoopy Pro"
             : !realisticOffered ? "The more real voices need a Mac with Apple silicon"
             : chosen != nil && !has ? "\(chosen!.name) has no second voice"
             : !voice.changer.realistic ? "Works with the more real voices (move the slider right)"
@@ -3174,7 +3174,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         if quietRow.alphaValue != soft {
             if window?.isVisible == true { Theme.animate(0.25) { quietRow.animator().alphaValue = soft } } else { quietRow.alphaValue = soft }
         }
-        quietSwitch.toolTip = locked ? "Pitch Shift Pro"
+        quietSwitch.toolTip = locked ? "Swoopy Pro"
             : !realisticOffered ? "The more real voices need a Mac with Apple silicon"
             : chosen != nil && !has ? "\(chosen!.name) has no version that blocks background sounds"
             : !voice.changer.realistic ? "Works with the more real voices (move the slider right)"

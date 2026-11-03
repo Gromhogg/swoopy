@@ -1,21 +1,21 @@
 #!/bin/bash
-# Turns a downloaded RVC v2 voice (a .pth file, or a .zip with one inside) into a Pitch Shift voice, in one line:
+# Turns a downloaded RVC v2 voice (a .pth file, or a .zip with one inside) into a Swoopy voice, in one line:
 #
-#   curl -fsSL https://raw.githubusercontent.com/Gromhogg/pitch-shift/main/tools/convert-voice.sh | bash -s -- MODEL.pth
+#   curl -fsSL https://raw.githubusercontent.com/Gromhogg/swoopy/main/tools/convert-voice.sh | bash -s -- MODEL.pth
 #
-# Options after the file: --name NAME (shown in Pitch Shift; default: the file's name) and
+# Options after the file: --name NAME (shown in Swoopy; default: the file's name) and
 # --pitch high|medium|low|HZ (how high the voice is; asked if left out).
 #
 # The first time, it downloads uv (a small Python installer), Python 3.11 and the converter's packages (about 0.5 GB
 # in all) into ~/Library/Application Support/Pitch Shift/Converter/. Nothing else on the Mac changes, and it never
 # needs your password. Delete that folder to remove them. The new voice lands in
-# ~/Library/Application Support/Pitch Shift/Voices/ and shows up in Pitch Shift's voice menu.
+# ~/Library/Application Support/Pitch Shift/Voices/ and shows up in Swoopy's voice menu.
 # Needs a Mac with Apple silicon (AI voices run only there).
 set -euo pipefail
 
 CONVERTER="${PITCH_SHIFT_CONVERTER_HOME:-$HOME/Library/Application Support/Pitch Shift/Converter}"
 REF="${PITCH_SHIFT_REF:-main}"  # which version of the converter to download
-RAW="https://raw.githubusercontent.com/Gromhogg/pitch-shift/$REF/tools/voice-converter"
+RAW="https://raw.githubusercontent.com/Gromhogg/swoopy/$REF/tools/voice-converter"
 UV_VERSION=0.12.18
 UV_SHA256=cf40e0c6a202190ccd9e0406dcfdd5b2d6668a9a5c779b17948963df32aafe5b  # uv-aarch64-apple-darwin.tar.gz
 
@@ -42,7 +42,7 @@ done
 (Tip: type a space after \"--\", then drag the file onto this Terminal window.)"
 [ -f "$model" ] || fail "can't find \"$model\"."
 
-# How high is the voice? (Pitch Shift moves your voice to this pitch.) Asked on the Terminal when not given.
+# How high is the voice? (Swoopy moves your voice to this pitch.) Asked on the Terminal when not given.
 if [ -z "$pitch" ]; then
   answer=""
   if { exec 3</dev/tty; } 2>/dev/null; then

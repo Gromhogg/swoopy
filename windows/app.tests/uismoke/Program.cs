@@ -1,7 +1,7 @@
-// GitHub checks only: drives the real Pitch Shift window like a person would (UI Automation via FlaUI),
+// GitHub checks only: drives the real Swoopy window like a person would (UI Automation via FlaUI),
 // checks what it shows and what the engine does, and takes pictures.
 //
-//   UiSmoke run --app dist\PitchShift.exe --tool dist\PitchShiftTool.exe --out ui-out [--source "Pitch Shift helper"]
+//   UiSmoke run --app dist\Swoopy.exe --tool dist\SwoopyTool.exe --out ui-out [--source "Swoopy helper"]
 //   UiSmoke dismiss-privacy [--out file.png]   clicks through Windows' first-sign-in privacy screen
 //   UiSmoke desktop --out file.png             picture of the whole screen
 using System.Diagnostics;
@@ -33,7 +33,7 @@ static class Program
         {
             return command switch
             {
-                "run" => new Smoke(Get("--app")!, Get("--tool")!, Get("--out") ?? "ui-out", Get("--source") ?? "Pitch Shift helper").Run(),
+                "run" => new Smoke(Get("--app")!, Get("--tool")!, Get("--out") ?? "ui-out", Get("--source") ?? "Swoopy helper").Run(),
                 "dismiss-privacy" => Privacy.Dismiss(Get("--out")),
                 "desktop" => Pictures.Desktop(Get("--out") ?? "desktop.png") ? 0 : 1,
                 _ => Usage(),
@@ -48,7 +48,7 @@ static class Program
 
     static int Usage()
     {
-        Console.WriteLine("UiSmoke run --app PitchShift.exe --tool PitchShiftTool.exe --out folder | dismiss-privacy | desktop --out file.png");
+        Console.WriteLine("UiSmoke run --app Swoopy.exe --tool SwoopyTool.exe --out folder | dismiss-privacy | desktop --out file.png");
         return 1;
     }
 
@@ -57,7 +57,7 @@ static class Program
 
 sealed class Smoke(string appExe, string toolExe, string outDir, string sourceName)
 {
-    const string Title = "Pitch Shift (beta)";
+    const string Title = "Swoopy (beta)";
     readonly List<JsonObject> checks = new();
     readonly UIA3Automation automation = new();
     int shotNumber;
@@ -139,7 +139,7 @@ sealed class Smoke(string appExe, string toolExe, string outDir, string sourceNa
         Check("engine records the ticked app", running is not null, Status()?["music"]?.ToJsonString());
         var apps = Status()?["music"]?["apps"]?.AsArray();
         Check("engine was given the app's program file",
-            apps?.Any(a => a?["exe"]?.GetValue<string>().EndsWith("PitchShiftTool.exe", StringComparison.OrdinalIgnoreCase) == true) == true,
+            apps?.Any(a => a?["exe"]?.GetValue<string>().EndsWith("SwoopyTool.exe", StringComparison.OrdinalIgnoreCase) == true) == true,
             apps?.ToJsonString());
         Shot(window, "app-ticked");
 
@@ -205,7 +205,7 @@ sealed class Smoke(string appExe, string toolExe, string outDir, string sourceNa
         Check("mic picker shows the chosen microphone", micName.Length > 0, micName);
         if (!hasMic)
         {
-            // GitHub's computers have no microphone (the virtual cable is Pitch Shift Mic itself).
+            // GitHub's computers have no microphone (the virtual cable is Swoopy Mic itself).
             Check("no microphone: the voice switch can't be turned on", Find(window, "VoiceSwitch")?.IsEnabled == false);
             Check("no microphone: Test is off", Find(window, "TestButton")?.IsEnabled == false);
             Shot(window, "no-microphone");
@@ -215,8 +215,8 @@ sealed class Smoke(string appExe, string toolExe, string outDir, string sourceNa
             Toggle(window, "VoiceSwitch");
             var voiceOn = WaitFor(() => Status()?["voice"]?["state"]?.GetValue<string>() is string v && v != "off" ? v : null, TimeSpan.FromSeconds(6));
             Check("voice switch on starts the voice", voiceOn is not null, voiceOn);
-            var micDuring = WaitFor(() => DefaultMic() is string m && m.Contains("Pitch Shift Mic") ? m : null, TimeSpan.FromSeconds(6));
-            Check("while voice is on, Pitch Shift Mic is the default mic", micDuring is not null, DefaultMic());
+            var micDuring = WaitFor(() => DefaultMic() is string m && m.Contains("Swoopy Mic") ? m : null, TimeSpan.FromSeconds(6));
+            Check("while voice is on, Swoopy Mic is the default mic", micDuring is not null, DefaultMic());
             Find(window, "StyleCartoon")?.Patterns.SelectionItem.Pattern.Select();
             Check("Cartoon reaches the engine", WaitFor(() => Status()?["voice"]?["natural"]?.GetValue<bool>() == false ? "" : null, TimeSpan.FromSeconds(3)) is not null);
             Find(window, "TestButton")?.AsButton().Invoke();
@@ -267,7 +267,7 @@ sealed class Smoke(string appExe, string toolExe, string outDir, string sourceNa
         // ---------- Close hides to the tray; opening again brings it back ----------
         window.Patterns.Window.Pattern.Close();
         Thread.Sleep(1500);
-        Check("closing the window keeps Pitch Shift running", !app.HasExited);
+        Check("closing the window keeps Swoopy running", !app.HasExited);
         Check("closing the window hides it", !IsWindowVisible(Handle(window)));
         var second = Process.Start(appExe);
         var secondExited = second.WaitForExit(15000);
@@ -288,7 +288,7 @@ sealed class Smoke(string appExe, string toolExe, string outDir, string sourceNa
         // ---------- Quit puts everything back ----------
         var quit = Process.Start(appExe, "--quit");
         quit.WaitForExit(30000);
-        Check("--quit ends Pitch Shift", app.WaitForExit(30000));
+        Check("--quit ends Swoopy", app.WaitForExit(30000));
         Thread.Sleep(1000);
         var diag = Diag();
         Check("no app volumes left lowered", diag?["restore_pending"]?.AsArray().Count == 0, diag?["restore_pending"]?.ToJsonString());
@@ -428,7 +428,7 @@ sealed class Smoke(string appExe, string toolExe, string outDir, string sourceNa
         Pictures.Window(Handle(window), path);
     }
 
-    // The running Pitch Shift's engine status (asked through its pipe, like a second copy would).
+    // The running Swoopy's engine status (asked through its pipe, like a second copy would).
     static JsonNode? Status()
     {
         try

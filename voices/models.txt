@@ -6,7 +6,7 @@
 # and put its tag in place of PLACEHOLDER.
 # 3.0.0 shipped the first-shape files (contentvec, woman, man) from the v3.0.0 release; 3.1.0 to 3.2.0 shipped the
 # blends woman_us_ahead and man_ahead (v3.1.0 release).
-# The look-ahead shape (Pitch Shift 3.1, "_ahead"): one file per voice serves every "Faster ↔ More real" position
+# The look-ahead shape (Swoopy 3.1, "_ahead"): one file per voice serves every "Faster ↔ More real" position
 # (convert_generator.py --context-ms 1000 --ahead-ms 700 --right-ms 40; the encoder: convert_contentvec.py
 # --context-ms 1710, 1.92 s window). Older voice files (the first shape) still load with this encoder and use no
 # look-ahead.
@@ -21,11 +21,11 @@
 # speech learning (round 4, epoch 40; research/voicechanger/results/trained4.md), converted the same way:
 # woman_us_r4_ahead, man_r4_ahead (= models/trained4/woman_us_r4e040 / man_r4e040, renamed).
 # name                         size(bytes)  sha256                                                            url
-contentvec_ahead.mlmodelc.zip  82964437     3566ad71d0625e4f7ac6eb1f77d7d3e9edf946a9ed5a913d4db7feab37354eb5  https://github.com/Gromhogg/pitch-shift/releases/download/v3.1.0/contentvec_ahead.mlmodelc.zip
-woman_us_t200_ahead.mlmodelc.zip  24950963  c714f2328e969d8cf4209b5a20a960b035c091c27061efe4f8e540b28a09476e  https://github.com/Gromhogg/pitch-shift/releases/download/v3.3.0/woman_us_t200_ahead.mlmodelc.zip
-man_t200_ahead.mlmodelc.zip       24953528  5932f2b5c524fd880b445115817255f9a425aca47e408a0060a05f663a34d729  https://github.com/Gromhogg/pitch-shift/releases/download/v3.3.0/man_t200_ahead.mlmodelc.zip
-woman_us_t200_sv3_ahead.mlmodelc.zip  24942611  eeeeb67a3a9f2d9a189485fbae231240a96c1ee951193d8d5b3b047b27ec26df  https://github.com/Gromhogg/pitch-shift/releases/download/v3.5.0/woman_us_t200_sv3_ahead.mlmodelc.zip
-man_t200_sv3_ahead.mlmodelc.zip   24949364  f2e2bcbfe380e637a83fd762acce53125a31c8059263f1b6c9b5d6cacbd68c9f  https://github.com/Gromhogg/pitch-shift/releases/download/v3.5.0/man_t200_sv3_ahead.mlmodelc.zip
-sound_sorter.mlmodelc.zip         6944367   ad3df22dc54bf6d4c41e6ba5e1b4b6f3d7bb5d5c50811927a33da124c81c7fda  https://github.com/Gromhogg/pitch-shift/releases/download/v3.5.0/sound_sorter.mlmodelc.zip
-woman_us_r4_ahead.mlmodelc.zip    24944417  26c6a7f93d669082617ca0e2345096b7f3a116d106a4ff6a41e61f575d4ebec4  https://github.com/Gromhogg/pitch-shift/releases/download/v3.5.0/woman_us_r4_ahead.mlmodelc.zip
-man_r4_ahead.mlmodelc.zip         24947021  fda9fca583df9a9c0ffa9b4f0173706681ac8511b3d923a2c3ddaa3b593fbfef  https://github.com/Gromhogg/pitch-shift/releases/download/v3.5.0/man_r4_ahead.mlmodelc.zip
+contentvec_ahead.mlmodelc.zip  82964437     3566ad71d0625e4f7ac6eb1f77d7d3e9edf946a9ed5a913d4db7feab37354eb5  https://github.com/Gromhogg/swoopy/releases/download/v3.1.0/contentvec_ahead.mlmodelc.zip
+woman_us_t200_ahead.mlmodelc.zip  24950963  c714f2328e969d8cf4209b5a20a960b035c091c27061efe4f8e540b28a09476e  https://github.com/Gromhogg/swoopy/releases/download/v3.3.0/woman_us_t200_ahead.mlmodelc.zip
+man_t200_ahead.mlmodelc.zip       24953528  5932f2b5c524fd880b445115817255f9a425aca47e408a0060a05f663a34d729  https://github.com/Gromhogg/swoopy/releases/download/v3.3.0/man_t200_ahead.mlmodelc.zip
+woman_us_t200_sv3_ahead.mlmodelc.zip  24942611  eeeeb67a3a9f2d9a189485fbae231240a96c1ee951193d8d5b3b047b27ec26df  https://github.com/Gromhogg/swoopy/releases/download/v3.5.0/woman_us_t200_sv3_ahead.mlmodelc.zip
+man_t200_sv3_ahead.mlmodelc.zip   24949364  f2e2bcbfe380e637a83fd762acce53125a31c8059263f1b6c9b5d6cacbd68c9f  https://github.com/Gromhogg/swoopy/releases/download/v3.5.0/man_t200_sv3_ahead.mlmodelc.zip
+sound_sorter.mlmodelc.zip         6944367   ad3df22dc54bf6d4c41e6ba5e1b4b6f3d7bb5d5c50811927a33da124c81c7fda  https://github.com/Gromhogg/swoopy/releases/download/v3.5.0/sound_sorter.mlmodelc.zip
+woman_us_r4_ahead.mlmodelc.zip    24944417  26c6a7f93d669082617ca0e2345096b7f3a116d106a4ff6a41e61f575d4ebec4  https://github.com/Gromhogg/swoopy/releases/download/v3.5.0/woman_us_r4_ahead.mlmodelc.zip
+man_r4_ahead.mlmodelc.zip         24947021  fda9fca583df9a9c0ffa9b4f0173706681ac8511b3d923a2c3ddaa3b593fbfef  https://github.com/Gromhogg/swoopy/releases/download/v3.5.0/man_r4_ahead.mlmodelc.zip

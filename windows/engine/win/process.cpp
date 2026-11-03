@@ -53,7 +53,7 @@ std::wstring module_dir() {
     }
 }
 
-std::wstring tool_path() { return module_dir() + L"\\PitchShiftTool.exe"; }
+std::wstring tool_path() { return module_dir() + L"\\SwoopyTool.exe"; }
 
 DWORD parent_pid_of(DWORD pid) {
     DWORD parent = 0;

@@ -1,5 +1,5 @@
 # GitHub checks only: installs Inno Setup (pinned version, checked by SHA-256) and builds
-# PitchShift-Setup.exe + PitchShift-Setup.exe.sha256 from the x64 and ARM64 app folders.
+# Swoopy-Setup.exe + Swoopy-Setup.exe.sha256 from the x64 and ARM64 app folders.
 param(
     [Parameter(Mandatory)] [string]$DistX64,
     [Parameter(Mandatory)] [string]$DistArm64,
@@ -24,20 +24,20 @@ $p = Start-Process -FilePath $setup -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBO
 if ($p.ExitCode -ne 0 -or -not (Test-Path $iscc)) { throw "Inno Setup didn't install (code $($p.ExitCode))" }
 
 foreach ($dist in $DistX64, $DistArm64) {
-    foreach ($file in 'PitchShift.exe', 'PitchShiftEngine.dll', 'PitchShiftTool.exe') {
+    foreach ($file in 'Swoopy.exe', 'SwoopyEngine.dll', 'SwoopyTool.exe') {
         if (-not (Test-Path (Join-Path $dist $file))) { throw "Missing $file in $dist" }
     }
 }
 
-$script = Join-Path $PSScriptRoot '..\PitchShift.iss'
+$script = Join-Path $PSScriptRoot '..\Swoopy.iss'
 New-Item -ItemType Directory -Force -Path $Out | Out-Null
 & $iscc "/DAppVersion=$Version" "/DNumericVersion=$NumericVersion" `
     "/DDistX64=$((Resolve-Path $DistX64).Path)" "/DDistArm64=$((Resolve-Path $DistArm64).Path)" `
     "/O$((Resolve-Path $Out).Path)" $script
 if ($LASTEXITCODE -ne 0) { throw "ISCC failed ($LASTEXITCODE)" }
 
-$exe = Join-Path $Out 'PitchShift-Setup.exe'
+$exe = Join-Path $Out 'Swoopy-Setup.exe'
 $hash = (Get-FileHash -Algorithm SHA256 -Path $exe).Hash.ToLowerInvariant()
-"$hash  PitchShift-Setup.exe" | Out-File -FilePath "$exe.sha256" -Encoding ascii -NoNewline
+"$hash  Swoopy-Setup.exe" | Out-File -FilePath "$exe.sha256" -Encoding ascii -NoNewline
 Get-ChildItem $Out | Format-Table Name, Length | Out-String | Write-Host
 Write-Host "SHA-256: $hash"

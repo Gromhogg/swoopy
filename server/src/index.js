@@ -1,4 +1,4 @@
-// Pitch Shift Pro: the unlock server (a Cloudflare Worker with one KV store, "PRO").
+// Swoopy Pro: the unlock server (a Cloudflare Worker with one KV store, "PRO").
 //   POST /stripe-webhook   Stripe's message after a payment: make the key, save it, email it. A full refund turns
 //                          the key off.
 //   GET  /thanks?session_id=…   the page Stripe sends the buyer to: shows the key.
@@ -172,7 +172,7 @@ export default {
         case "GET /thanks": return await thanks(request, env, url);
         case "POST /activate": return await activate(request, env);
         case "POST /check": return await check(request, env);
-        case "GET /": return new Response("Pitch Shift Pro\n", { headers: { "Content-Type": "text/plain" } });
+        case "GET /": return new Response("Swoopy Pro\n", { headers: { "Content-Type": "text/plain" } });
         default: return json({ ok: false, error: "not-found" }, 404);
       }
     } catch (error) {

@@ -1,6 +1,6 @@
 // "Your voice": takes a microphone, changes its pitch with Rubber Band (its newer engine, in live mode), and sends it
-// into "Pitch Shift Mic" (a virtual mic people pick in Discord, Zoom, ...). It only runs while some app is actually
-// listening to Pitch Shift Mic, so the real mic (and Bluetooth call mode) is only on when needed.
+// into "Swoopy Mic" (a virtual mic people pick in Discord, Zoom, ...). It only runs while some app is actually
+// listening to Swoopy Mic, so the real mic (and Bluetooth call mode) is only on when needed.
 import AppKit
 import AVFoundation
 import CoreAudio
@@ -31,7 +31,7 @@ enum Mics {
     static var virtualFeed: AudioDeviceID? { device(uid: virtualMicFeedUID) }
     static var driverInstalled: Bool { virtualMic != nil && virtualFeed != nil }
 
-    // Real microphones to choose from (no virtual devices like Pitch Shift Mic or BlackHole, and no combined devices).
+    // Real microphones to choose from (no virtual devices like Swoopy Mic or BlackHole, and no combined devices).
     static func list() -> [MicInfo] {
         allDevices().filter { id in
             let transport = transportType(id)
@@ -50,7 +50,7 @@ enum Mics {
     static func choose(_ savedUID: String?) -> (mic: AudioDeviceID?, skipped: AudioDeviceID?) {
         let choices = list()
         if let savedUID, choices.contains(where: { $0.uid == savedUID }), let id = device(uid: savedUID) { return (id, nil) }
-        // While Pitch Shift Mic is the Mac's default mic, the real one is the mic that was default before.
+        // While Swoopy Mic is the Mac's default mic, the real one is the mic that was default before.
         let fallback = DefaultMic.realMic ?? defaultInput()
         guard choices.contains(where: { $0.uid == deviceUID(fallback) }) else { return (builtIn, nil) }
         if let builtIn, isHeadsetMic(fallback, of: defaultOutput()) { return (builtIn, fallback) }
@@ -134,7 +134,7 @@ struct ChangerOptions {
     var quiet = false                 // --block-background
 }
 
-// The sound effect (Soundboard) to mix into Pitch Shift Mic. Set from the window, read by the sound thread without
+// The sound effect (Soundboard) to mix into Swoopy Mic. Set from the window, read by the sound thread without
 // waiting. The samples belong to a SoundClip that the window side keeps alive while the sound thread may read them.
 struct SoundPlay: @unchecked Sendable {
     var samples: UnsafePointer<Float>?  // nil = no sound
@@ -146,7 +146,7 @@ struct SoundPlay: @unchecked Sendable {
 }
 
 // Plays the Soundboard's sound one sample at a time on a sound thread, following SoundPlay. Used for both copies:
-// the one sent into Pitch Shift Mic (VoiceChain) and the owner's own (Soundboard), so both stop and switch the same
+// the one sent into Swoopy Mic (VoiceChain) and the owner's own (Soundboard), so both stop and switch the same
 // way. A sound that is stopped or replaced fades out over 10 ms (stopping at once would click); a new one starts
 // from its beginning. A new volume for the playing sound glides there in about 20 ms (a jump would click too).
 // A sound also fades in over its first 5 ms and out over its last 10 ms: many files start or end in the middle of a
@@ -252,7 +252,7 @@ struct SoundMix {
 }
 
 // Keeps voice + sound under full scale: unchanged up to 0.7, then eased so it never passes 0.95 (the Mac's clock
-// matching between the mic and Pitch Shift Mic can add about 1% on top).
+// matching between the mic and Swoopy Mic can add about 1% on top).
 @inline(__always) func softLimit(_ x: Float) -> Float {
     let knee: Float = 0.7, ceiling: Float = 0.95
     let size = abs(x)
@@ -261,7 +261,7 @@ struct SoundMix {
     return x < 0 ? -eased : eased
 }
 
-// What Pitch Shift Mic sends after the voice: the Soundboard's sound mixed in, and the mic muted while a sound plays
+// What Swoopy Mic sends after the voice: the Soundboard's sound mixed in, and the mic muted while a sound plays
 // on the Mac's own speakers. Used on the voice chain's sound thread (VoiceChain) and by the offline check
 // (--render-sounds), so both do exactly the same. Makes no memory and never waits.
 //
@@ -269,7 +269,7 @@ struct SoundMix {
 // when they'd pass it, held 15 ms, then back up over about 150 ms (after the sound it only comes back up, which
 // takes up to about a second, so the voice never jumps). Before, the sum was only eased sample by sample from 0.7
 // up to 0.95 (just under full scale): a loud sound at 150% sat in that bend half the time, and its points between
-// samples went past full scale (up to +3.4 dBFS), which the clock matching into Pitch Shift Mic and the call app
+// samples went past full scale (up to +3.4 dBFS), which the clock matching into Swoopy Mic and the call app
 // turn into clipped samples. With no sound playing nothing changes.
 struct CallMix {
     private(set) var mix: SoundMix
@@ -898,12 +898,12 @@ struct SlowReading {
     }
 }
 
-// One running voice chain: a private combined device of [real mic + hidden side of Pitch Shift Mic] with one
+// One running voice chain: a private combined device of [real mic + hidden side of Swoopy Mic] with one
 // sound callback, so both run on the mic's clock (Core Audio corrects the tiny clock difference).
 final class VoiceChain {
     let micName: String
     let micUID: String
-    let devices: [AudioDeviceID]  // the mic and both sides of Pitch Shift Mic, as Core Audio numbered them
+    let devices: [AudioDeviceID]  // the mic and both sides of Swoopy Mic, as Core Audio numbered them
     let sampleRate: Double
     private var aggregate = AudioObjectID(kAudioObjectUnknown)
     private var proc: AudioDeviceIOProcID?
@@ -954,9 +954,9 @@ final class VoiceChain {
         let rate = nominalRate(mic)
         guard rate > 0 else { throw Problem(message: "Can't use \(micName).") }
         sampleRate = rate
-        // Both sides of a combined device must run at the same rate; change Pitch Shift Mic, never the real mic.
+        // Both sides of a combined device must run at the same rate; change Swoopy Mic, never the real mic.
         if nominalRate(feed) != rate {
-            guard setNominalRate(feed, rate) else { throw Problem(message: "Pitch Shift Mic can't run at \(Int(rate)) Hz.") }
+            guard setNominalRate(feed, rate) else { throw Problem(message: "Swoopy Mic can't run at \(Int(rate)) Hz.") }
             for _ in 0..<20 where nominalRate(feed) != rate { Thread.sleep(forTimeInterval: 0.05) }
         }
         micOutputStreams = streamCount(mic, kAudioDevicePropertyScopeOutput)
@@ -986,7 +986,7 @@ final class VoiceChain {
         ring = VoiceRing(rate: rate)
 
         let settings: [String: Any] = [
-            kAudioAggregateDeviceNameKey: "Pitch Shift Voice",
+            kAudioAggregateDeviceNameKey: "Swoopy Voice",
             kAudioAggregateDeviceUIDKey: UUID().uuidString,
             kAudioAggregateDeviceIsPrivateKey: true,
             kAudioAggregateDeviceMainSubDeviceKey: micUID,
@@ -1050,7 +1050,7 @@ final class VoiceChain {
         return """
             combined device: in \(io(aggregate, kAudioDevicePropertyScopeInput)) | out \(io(aggregate, kAudioDevicePropertyScopeOutput))
               mic \(micName): \(io(devices[0], kAudioDevicePropertyScopeInput))
-              hidden feed: \(io(devices[2], kAudioDevicePropertyScopeOutput)); Pitch Shift Mic: \(io(devices[1], kAudioDevicePropertyScopeInput))
+              hidden feed: \(io(devices[2], kAudioDevicePropertyScopeOutput)); Swoopy Mic: \(io(devices[1], kAudioDevicePropertyScopeInput))
               \(stretcher.delayNote) (\(Int(rate)) Hz), pieces up to \(maxPiece)
               waiting sound: starts at one callback + \(ms(UInt32(ring.startCushion))) ms, then kept \(ms(UInt32(ring.margin))) ms above the lowest point
             """
@@ -1328,7 +1328,7 @@ struct VoiceStats {
 
 enum VoiceState: Equatable {
     case off
-    case noDriver   // Pitch Shift Mic isn't installed
+    case noDriver   // Swoopy Mic isn't installed
     case noMic      // no microphone found
     case ready      // on, waiting for an app to listen
     case live       // running
@@ -1337,7 +1337,7 @@ enum VoiceState: Equatable {
 
 // Decides when the voice chain runs, which mic it uses, and rebuilds it when devices change. It runs while "Your
 // voice" or the Voice changer is on, and also while the Soundboard is open with both off: then the mic goes into
-// Pitch Shift Mic unchanged (no pitch change, so Rubber Band isn't used and there's almost no delay), with the sounds
+// Swoopy Mic unchanged (no pitch change, so Rubber Band isn't used and there's almost no delay), with the sounds
 // mixed in.
 final class VoiceShifter {
     var halfSteps: Float { didSet { pushParams() } }
@@ -1363,7 +1363,7 @@ final class VoiceShifter {
     var testSource: ((UnsafeMutablePointer<Float>, Int) -> Void)?
     var testBufferFrames: UInt32?  // --test-voice --buffer N: the callback size to ask for
     private(set) var state: VoiceState = .off
-    private(set) var listening = false  // some app is using Pitch Shift Mic right now
+    private(set) var listening = false  // some app is using Swoopy Mic right now
     private(set) var chain: VoiceChain?
     let params: OSAllocatedUnfairLock<VoiceParams>
     let sounds = OSAllocatedUnfairLock(uncheckedState: SoundPlay())  // the Soundboard's sound, for the chain
@@ -1543,8 +1543,8 @@ final class VoiceShifter {
 
     // "Delay: about …" on the Voice changer card: from the mic to the call, in seconds, for these settings. The
     // processing (Natural: the shifter and its waiting sound, as the running chain measures it, else 45 ms; AI: the
-    // stream's fixed delay at this look-ahead), the sound waiting one callback in and out, and what the mic and Pitch
-    // Shift Mic add as the Mac reports them.
+    // stream's fixed delay at this look-ahead), the sound waiting one callback in and out, and what the mic and Swoopy
+    // Mic add as the Mac reports them.
     func changerDelay(for settings: ChangerSettings) -> Double {
         let mic = chain?.devices.first ?? currentMic
         let rate = chain?.sampleRate ?? mic.map(nominalRate).flatMap { $0 > 0 ? $0 : nil } ?? 48000
@@ -1648,7 +1648,7 @@ final class VoiceShifter {
         onChange()
     }
 
-    // Watches whether an app (Discord, Zoom, ...) is listening to Pitch Shift Mic, and its sample rate.
+    // Watches whether an app (Discord, Zoom, ...) is listening to Swoopy Mic, and its sample rate.
     private func watchVirtualMic() {
         micListeners = []
         guard let mic = Mics.virtualMic, let feed = Mics.virtualFeed else { return }
@@ -1680,7 +1680,7 @@ final class VoiceShifter {
 
     // Making or closing our own private combined device also counts as "devices changed", so without this check
     // the chain restarted itself every few seconds (a short gap in the voice each time). Only start over when the
-    // mic, Pitch Shift Mic, or a sample rate really changed.
+    // mic, Swoopy Mic, or a sample rate really changed.
     private func needsNewChain(_ chain: VoiceChain) -> Bool {
         guard let mic = currentMic, let virtualMic = Mics.virtualMic, let feed = Mics.virtualFeed,
               [mic, virtualMic, feed] == chain.devices, deviceUID(mic) == chain.micUID else { return true }
@@ -1752,7 +1752,7 @@ final class VoiceShifter {
     }
 }
 
-// Records sound from a device into memory (used by Test to record what Pitch Shift Mic sends).
+// Records sound from a device into memory (used by Test to record what Swoopy Mic sends).
 final class Recorder {
     let sampleRate: Double
     private let device: AudioDeviceID
@@ -1805,7 +1805,7 @@ final class Recorder {
     }
 }
 
-// The Test button: record 5 seconds of what Pitch Shift Mic sends, then play it back. With the AI voice on, what is
+// The Test button: record 5 seconds of what Swoopy Mic sends, then play it back. With the AI voice on, what is
 // said comes out its fixed delay later (0.3 to 1 s): the recording goes on that much longer and is played from that
 // point, so the clip holds the 5 seconds said, all in the AI voice (not the quiet start of a new AI stream).
 final class VoiceTest {
@@ -2032,7 +2032,7 @@ func changerStatsLine(_ s: VoiceChangerStats, seconds: Double) -> String {
 // Offline copy of the live chain's timing (--render-voice ... --live-sim [--buffer 128]): the file goes through the
 // same steps as VoiceChain.render, in callback-sized pieces (Rubber Band, the waiting sound in a VoiceRing, the voice
 // changer's analyse and post), and the result is written as the chain would send it (late by the chain's delay).
-// Prints the Rubber Band + waiting-sound delay (the part of the mic-to-Pitch-Shift-Mic delay this code adds) and
+// Prints the Rubber Band + waiting-sound delay (the part of the mic-to-Swoopy-Mic delay this code adds) and
 // the ring's dry-outs, trims and replays. No devices are used.
 func simulateVoiceChain(input: String, output: String, halfSteps: Float, cartoon: Float, slowDeeper: Bool, fastHigher: Float = 0,
                         changer: ChangerOptions?, blockFrames: Int) throws {

@@ -1,4 +1,5 @@
 #!/bin/bash
-# Quit Pitch Shift if it's open, so it can be replaced.
+# Quit the app if it's open (Swoopy, or PitchShift in older versions), so it can be replaced.
+if pkill -x Swoopy 2>/dev/null; then sleep 1; fi
 if pkill -x PitchShift 2>/dev/null; then sleep 1; fi
 exit 0

@@ -40,11 +40,11 @@ export function keyPage(key, email, emailed) {
   const sent = emailed && email
     ? `We also emailed it to ${escapeHtml(maskEmail(email))}.`
     : "Save this key somewhere safe (a note or your Passwords app).";
-  return page("Your Pitch Shift Pro key", `<h1>Thank you!</h1>
-<p>Here is your Pitch Shift Pro key. ${sent}</p>
+  return page("Your Swoopy Pro key", `<h1>Thank you!</h1>
+<p>Here is your Swoopy Pro key. ${sent}</p>
 <div class="key" id="key">${escapeHtml(key)}</div>
 <button id="copy" type="button">Copy key</button>
-<ol class="soft"><li>Open Pitch Shift and click <b>Unlock Pro</b>.</li><li>Paste the key and click <b>Unlock</b>.</li>
+<ol class="soft"><li>Open Swoopy and click <b>Unlock Pro</b>.</li><li>Paste the key and click <b>Unlock</b>.</li>
 <li>It works on all your Macs, for good.</li></ol>
 <script>
 document.getElementById("copy").onclick = async () => {

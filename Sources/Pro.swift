@@ -1,4 +1,4 @@
-// Pitch Shift Pro: the $5 unlock (plan: notes/paid-unlock-plan.md). People email the owner for a key; the owner makes
+// Swoopy Pro: the $5 unlock (plan: notes/paid-unlock-plan.md). People email the owner for a key; the owner makes
 // it on their Mac with tools/pro-keys.sh and emails it back. The app checks a key on its own, with no internet: a key
 // is signed with the owner's private signing key, and the app holds only the public half, which can check a key but
 // can't make one (see ProKey). An accepted key is kept in ~/Library/Application Support/Pitch Shift/Pro.json and
@@ -253,7 +253,7 @@ final class Pro {
 
     // Checks a typed key (typos first, then whether it's a key the owner made), then keeps it.
     func activate(_ typed: String) -> Outcome {
-        guard !publicKey.isEmpty else { return .problem("Unlocking isn't set up in this copy of Pitch Shift.") }
+        guard !publicKey.isEmpty else { return .problem("Unlocking isn't set up in this copy of Swoopy.") }
         let key: String
         switch ProKey.read(typed) {
         case .success(let good): key = good
@@ -277,7 +277,7 @@ final class Pro {
     }
 }
 
-// The unlock window: a sheet on the main window. Locked: "Pitch Shift Pro: $5", what it adds, the address to email
+// The unlock window: a sheet on the main window. Locked: "Swoopy Pro: $5", what it adds, the address to email
 // for a key with an "Email for a key" button (opens Mail), a box for the key, and Unlock. Unlocked: a thank-you and
 // the end of the key.
 final class ProSheet: NSObject, NSTextFieldDelegate {
@@ -294,7 +294,7 @@ final class ProSheet: NSObject, NSTextFieldDelegate {
     var isOpen: Bool { panel != nil }
 
     // A new email to the owner, with the subject filled in (opens in the Mail app, or whatever app handles email).
-    static let mailURL = URL(string: "mailto:\(ProConfig.email)?subject=Pitch%20Shift%20Pro%20key")
+    static let mailURL = URL(string: "mailto:\(ProConfig.email)?subject=Swoopy%20Pro%20key")
 
     override init() {
         super.init()
@@ -348,7 +348,7 @@ final class ProSheet: NSObject, NSTextFieldDelegate {
         fieldHeight.constant = (needed + 6).rounded(.up)
         message.preferredMaxLayoutWidth = width - 40
         let panel = NSPanel(contentRect: NSRect(x: 0, y: 0, width: width, height: 200), styleMask: [.titled], backing: .buffered, defer: false)
-        panel.title = "Pitch Shift Pro"
+        panel.title = "Swoopy Pro"
         panel.appearance = window.appearance  // light or dark, like the main window
         let content = Pro.shared.unlocked ? unlockedView() : lockedView()
         panel.contentView = content
@@ -417,7 +417,7 @@ final class ProSheet: NSObject, NSTextFieldDelegate {
         show("", color: .secondaryLabelColor)
         cancelButton.isEnabled = true
         unlockButton.isEnabled = false
-        return stack([header("Pitch Shift Pro: \(ProConfig.price)", line), emailButton, field, message,
+        return stack([header("Swoopy Pro: \(ProConfig.price)", line), emailButton, field, message,
                       buttonRow([cancelButton, unlockButton])])
     }
 
@@ -428,7 +428,7 @@ final class ProSheet: NSObject, NSTextFieldDelegate {
         let done = NSButton(title: "Done", target: self, action: #selector(close))
         done.bezelStyle = .rounded
         done.keyEquivalent = "\r"
-        return stack([header("Pitch Shift Pro", "Unlocked on this Mac. Thank you!")] + (key.map { [$0] } ?? []) + [buttonRow([done])])
+        return stack([header("Swoopy Pro", "Unlocked on this Mac. Thank you!")] + (key.map { [$0] } ?? []) + [buttonRow([done])])
     }
 
     private func show(_ text: String, color: NSColor) {
@@ -499,7 +499,7 @@ final class ProSheet: NSObject, NSTextFieldDelegate {
         guard let panel else { return }
         let lines = ProKey.shown(ProKey.raw(Pro.exampleKey)).split(separator: "\n")
         let pasted = "  " + lines.joined(separator: " \r\n") + "\n"
-        let board = NSPasteboard(name: NSPasteboard.Name("PitchShiftPreviewPaste"))
+        let board = NSPasteboard(name: NSPasteboard.Name("SwoopyPreviewPaste"))
         board.clearContents()
         board.setString(pasted, forType: .string)
         panel.makeFirstResponder(field)

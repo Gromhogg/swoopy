@@ -53,21 +53,21 @@ enum VoiceFolder {
 
     // The same text as tools/voice-converter/convert_voice.py writes.
     static let readme = """
-    Pitch Shift voices
+    Swoopy voices
 
-    Each voice is a folder in here (or a .zip of one you add with Add Voice...). Pitch Shift lists them in the Voice
+    Each voice is a folder in here (or a .zip of one you add with Add Voice...). Swoopy lists them in the Voice
     changer's voice menu.
 
     A voice folder holds:
-    - voice.json: the voice's name and settings. Pitch Shift writes it for you when you add a voice.
+    - voice.json: the voice's name and settings. Swoopy writes it for you when you add a voice.
     - a .mlmodelc folder (optional): the AI voice (Macs with Apple silicon). Without one, the voice
       uses the plain voice changer.
 
     To add a voice:
     - Downloaded an RVC v2 voice (a .pth file, or a .zip with one inside)? Turn it into a voice folder with the one line
-      under "Your own voices" in Pitch Shift's README (https://github.com/Gromhogg/pitch-shift#your-own-voices). The new
+      under "Your own voices" in Swoopy's README (https://github.com/Gromhogg/swoopy#your-own-voices). The new
       voice lands in here.
-    - Got a voice folder, or a .zip of one? In Pitch Shift's Voice changer, click the button next to the voice menu and
+    - Got a voice folder, or a .zip of one? In Swoopy's Voice changer, click the button next to the voice menu and
       choose Add Voice..., or drop the folder in here.
 
     To remove a voice, choose Remove in the same menu, or move its folder to the Trash.
@@ -148,7 +148,7 @@ struct VoiceImport {
         if !isDir.boolValue {
             switch ext {
             case "zip":
-                let scratch = fm.temporaryDirectory.appendingPathComponent("pitch-shift-voice-\(UUID().uuidString)")
+                let scratch = fm.temporaryDirectory.appendingPathComponent("swoopy-voice-\(UUID().uuidString)")
                 try fm.createDirectory(at: scratch, withIntermediateDirectories: true)
                 let unzip = Process()
                 unzip.executableURL = URL(fileURLWithPath: "/usr/bin/ditto")
@@ -183,11 +183,11 @@ struct VoiceImport {
     private static func unusable(_ ext: String, _ shown: String) -> Problem {
         switch ext {
         case "pth":
-            return Problem(message: "“\(shown)” is an RVC voice file. Turn it into a Pitch Shift voice first with the one line under “Your own voices” in Pitch Shift's README; it lands in the Voices folder by itself.")
+            return Problem(message: "“\(shown)” is an RVC voice file. Turn it into a Swoopy voice first with the one line under “Your own voices” in Swoopy's README; it lands in the Voices folder by itself.")
         case "index":
-            return Problem(message: "“\(shown)” is an RVC search index, not a voice. Pitch Shift needs the voice's .pth file, turned into a Pitch Shift voice with the converter (README, “Your own voices”).")
+            return Problem(message: "“\(shown)” is an RVC search index, not a voice. Swoopy needs the voice's .pth file, turned into a Swoopy voice with the converter (README, “Your own voices”).")
         case "onnx":
-            return Problem(message: "“\(shown)” is an .onnx voice, which Pitch Shift can't use. Look for the voice's .pth file and turn it into a Pitch Shift voice with the converter (README, “Your own voices”).")
+            return Problem(message: "“\(shown)” is an .onnx voice, which Swoopy can't use. Look for the voice's .pth file and turn it into a Swoopy voice with the converter (README, “Your own voices”).")
         default:
             return Problem(message: "“\(shown)” isn't a voice. Pick a voice folder (with a voice.json or a .mlmodelc inside) or a .zip of one.")
         }
@@ -233,14 +233,14 @@ struct VoiceImport {
             }
             manifest = object
             if let version = manifest["version"] as? Int, version > 1 {
-                throw Problem(message: "“\(shown)” was made for a newer version of Pitch Shift. Update Pitch Shift, then add it again.")
+                throw Problem(message: "“\(shown)” was made for a newer version of Swoopy. Update Swoopy, then add it again.")
             }
             if let natural = manifest["natural"] {
                 guard let n = try? JSONDecoder().decode(VoiceManifest.Natural.self, from: JSONSerialization.data(withJSONObject: natural)),
                       n.ltas.count == Int(VOICECHANGER_LTAS_BANDS),
                       ([n.targetHz, n.assumedInputHz, n.intonation, n.formant, n.breathDb, n.presenceDb, n.sibilanceKeep, n.eqAmount] + n.ltas).allSatisfy(\.isFinite),
                       n.targetHz > 0, n.assumedInputHz > 0, n.formant > 0 else {
-                    throw Problem(message: "The voice.json in “\(shown)” has Natural settings Pitch Shift can't read.")
+                    throw Problem(message: "The voice.json in “\(shown)” has Natural settings Swoopy can't read.")
                 }
             }
         }
@@ -334,14 +334,14 @@ struct VoiceImport {
         if voice["credits"] == nil { voice["credits"] = "Added from \(source.lastPathComponent)." }
         let data = try JSONSerialization.data(withJSONObject: voice, options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes])
         guard (try? JSONDecoder().decode(VoiceManifest.self, from: data)) != nil else {
-            throw Problem(message: "The voice.json in “\(name)” has settings Pitch Shift can't read.")
+            throw Problem(message: "The voice.json in “\(name)” has settings Swoopy can't read.")
         }
         try data.write(to: folder.appendingPathComponent("voice.json"))
         try fm.moveItem(at: folder, to: voices.appendingPathComponent(id))
         return id
     }
 
-    // Checks that the AI voice fits Pitch Shift's player and speech reader; returns its sample rate.
+    // Checks that the AI voice fits Swoopy's player and speech reader; returns its sample rate.
     static func check(model: URL, encoder: URL?, name: String) throws -> Int {
         let config = MLModelConfiguration()
         config.computeUnits = .cpuOnly
@@ -349,26 +349,26 @@ struct VoiceImport {
             throw Problem(message: "“\(name)”'s AI voice can't be opened.")
         }
         let inputs = loaded.modelDescription.inputDescriptionsByName
-        let convert = "Turn the original .pth voice into a Pitch Shift voice with the converter (README, “Your own voices”)."
+        let convert = "Turn the original .pth voice into a Swoopy voice with the converter (README, “Your own voices”)."
         guard let features = inputs["features"]?.multiArrayConstraint?.shape.map(\.intValue), features.count == 3,
               let pitch = inputs["pitch"]?.multiArrayConstraint?.shape.map(\.intValue), pitch.count == 2,
               inputs["source"] != nil, inputs["noise"] != nil, loaded.modelDescription.outputDescriptionsByName["audio"] != nil else {
-            throw Problem(message: "“\(name)”'s AI voice isn't one Pitch Shift can play. \(convert)")
+            throw Problem(message: "“\(name)”'s AI voice isn't one Swoopy can play. \(convert)")
         }
         if features[2] == 256 {
-            throw Problem(message: "“\(name)” is an RVC v1 voice; Pitch Shift needs RVC v2 voices. Look for a v2 version of it.")
+            throw Problem(message: "“\(name)” is an RVC v1 voice; Swoopy needs RVC v2 voices. Look for a v2 version of it.")
         }
-        guard features[2] == 768 else { throw Problem(message: "“\(name)”'s AI voice isn't one Pitch Shift can play. \(convert)") }
+        guard features[2] == 768 else { throw Problem(message: "“\(name)”'s AI voice isn't one Swoopy can play. \(convert)") }
         let meta = loaded.modelDescription.metadata[.creatorDefinedKey] as? [String: String] ?? [:]
         let rate = Int(meta["rate"] ?? "") ?? 0
         guard [32000, 40000, 48000].contains(rate) else {
-            throw Problem(message: rate == 0 ? "“\(name)”'s AI voice isn't one Pitch Shift can play. \(convert)"
-                                             : "“\(name)” was made at \(rate) Hz; Pitch Shift can play voices made at 32, 40 or 48 kHz.")
+            throw Problem(message: rate == 0 ? "“\(name)”'s AI voice isn't one Swoopy can play. \(convert)"
+                                             : "“\(name)” was made at \(rate) Hz; Swoopy can play voices made at 32, 40 or 48 kHz.")
         }
         // The speech reader's window may be longer than the voice's (by an even number of frames), as VoiceModel.mm
         // allows: the 3.1 reader (look-ahead shape) also reads for voices made in the first shape.
         if let encoder, let frames = encoderFrames(encoder), frames < pitch[1] || (frames - pitch[1]) % 2 != 0 {
-            throw Problem(message: "“\(name)” was made for a different version of Pitch Shift. Turn the original .pth voice into a Pitch Shift voice again with the converter (README, “Your own voices”).")
+            throw Problem(message: "“\(name)” was made for a different version of Swoopy. Turn the original .pth voice into a Swoopy voice again with the converter (README, “Your own voices”).")
         }
         return rate
     }

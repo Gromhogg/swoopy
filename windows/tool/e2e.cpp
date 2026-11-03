@@ -134,8 +134,8 @@ double faint_db(const std::vector<float>& mono, double hz) {
 }
 
 // Where the recording is exactly zero for 1 ms or more (start, length in frames). Then nothing at all reached the
-// cable, not even the quieted original, which never goes through Pitch Shift. So such a gap comes from Windows, the
-// cable or the recording: a gap in Pitch Shift's own sound would still leave the quiet original playing.
+// cable, not even the quieted original, which never goes through Swoopy. So such a gap comes from Windows, the
+// cable or the recording: a gap in Swoopy's own sound would still leave the quiet original playing.
 std::vector<std::pair<size_t, size_t>> cable_silences(const std::vector<float>& mono) {
     std::vector<std::pair<size_t, size_t>> out;
     const size_t at_least = kRate / 1000;
@@ -152,8 +152,8 @@ std::vector<std::pair<size_t, size_t>> cable_silences(const std::vector<float>& 
 }
 
 // The long runs' "no audible gaps" check: the shifted tone's level in 50 ms pieces never dips more than 3 dB.
-// Pieces where the whole cable went silent (see cable_silences: not a gap of Pitch Shift's) are listed on their own.
-// The quiet original must be playing to the cable too, or a gap of Pitch Shift's would look the same.
+// Pieces where the whole cable went silent (see cable_silences: not a gap of Swoopy's) are listed on their own.
+// The quiet original must be playing to the cable too, or a gap of Swoopy's would look the same.
 void check_no_dips(Report& r, const std::vector<float>& left, double hz) {
     const size_t piece = kRate / 20;
     const auto silences = cable_silences(left);
@@ -173,7 +173,7 @@ void check_no_dips(Report& r, const std::vector<float>& left, double hz) {
     r.info("long_run_seconds_recorded", double(left.size()) / kRate);
     r.info("long_run_cable_silences", cable_gaps,
            "pieces where nothing at all reached the cable, not even the quiet original (a hiccup of Windows, the "
-           "cable or the recording, not of Pitch Shift)");
+           "cable or the recording, not of Swoopy)");
     r.check("long_run_no_dips", !levels.empty() && lowest > median - 3.0, lowest - median,
             "the shifted tone never dipped more than 3 dB (no audible gaps)");
 }
@@ -929,11 +929,11 @@ int e2e_voice(const Args& args) {
     voice.start(L"");
     sleep_s(1.5);
     r.check("idle_without_call_app", voice.status()["state"] == "idle", voice.status()["state"],
-            "nothing runs until an app uses Pitch Shift Mic");
+            "nothing runs until an app uses Swoopy Mic");
     r.check("voice_on_makes_default_mic",
             default_endpoint_id(eCapture, eConsole) == cable.mic_id &&
                 default_endpoint_id(eCapture, eCommunications) == cable.mic_id,
-            utf8(default_endpoint_id(eCapture, eConsole)), "while on, Pitch Shift Mic is the default microphone");
+            utf8(default_endpoint_id(eCapture, eConsole)), "while on, Swoopy Mic is the default microphone");
 
     auto listen = [&](const std::string& name) {
         const fs::path wav = r.out() / (name + ".wav");
@@ -949,7 +949,7 @@ int e2e_voice(const Args& args) {
         }
         r.info(name + "_status", last);
         r.check(name + "_runs_for_call_app", in_use && running, json{{"in_use", in_use}, {"running", running}},
-                "the voice path starts when a call app records from Pitch Shift Mic");
+                "the voice path starts when a call app records from Swoopy Mic");
         return read_wav(wav.string());
     };
 
@@ -1091,7 +1091,7 @@ int e2e_crash(const Args& args) {
         return start_process(self_path(), L"host --pid " + std::to_wstring(pid) + L" --semitones 2 --file \"" + list + L"\"");
     };
 
-    say("1. Pitch Shift ends suddenly while an app is quiet");
+    say("1. Swoopy ends suddenly while an app is quiet");
     auto a = start_player(L"--freq 440 --amp 0.25 --seconds 900", r);
     wait_session(a->pid());
     auto h = start_host(a->pid());
@@ -1103,7 +1103,7 @@ int e2e_crash(const Args& args) {
     r.check("watchdog_restored", back, std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count(),
             "the watchdog put the volume back (seconds)");
 
-    say("2. the quiet app quits, then Pitch Shift ends suddenly");
+    say("2. the quiet app quits, then Swoopy ends suddenly");
     auto h2 = start_host(a->pid());
     const bool quieted_again = wait_volumes(a->pid(), kQuietLevel, 15);
     r.check("host_quieted_again", quieted_again, volumes_of(a->pid()), "");
@@ -1119,7 +1119,7 @@ int e2e_crash(const Args& args) {
     a2->kill();
     restore_all(list);
 
-    say("3. Pitch Shift ends suddenly while 'Your voice' is on");
+    say("3. Swoopy ends suddenly while 'Your voice' is on");
     const auto cable = find_cable();
     const std::wstring before_console = default_endpoint_id(eCapture, eConsole);
     const std::wstring before_comms = default_endpoint_id(eCapture, eCommunications);
@@ -1133,7 +1133,7 @@ int e2e_crash(const Args& args) {
                 default_endpoint_id(eCapture, eCommunications) == cable.mic_id;
     }
     r.check("voice_host_took_default_mic", taken, utf8(default_endpoint_id(eCapture, eConsole)),
-            "Pitch Shift Mic became the default microphone");
+            "Swoopy Mic became the default microphone");
     hv->kill();  // like "taskkill /F"
     bool mic_back = false;
     const auto t1 = std::chrono::steady_clock::now();

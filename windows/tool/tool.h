@@ -1,4 +1,4 @@
-// PitchShiftTool.exe: setup, repair and test commands that run without the window.
+// SwoopyTool.exe: setup, repair and test commands that run without the window.
 #pragma once
 #include <string>
 #include <vector>

@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <!-- GitHub checks only: clicks through the real Pitch Shift window with UI Automation (FlaUI)
+  <!-- GitHub checks only: clicks through the real Swoopy window with UI Automation (FlaUI)
        and takes pictures. See Program.cs. -->
   <PropertyGroup>
     <OutputType>Exe</OutputType>

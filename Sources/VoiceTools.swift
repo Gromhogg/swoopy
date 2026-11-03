@@ -35,13 +35,13 @@ final class VoiceTools: NSObject {
 
     var views: [NSView] { [button, busy] }
 
-    // Pitch Shift Pro is locked: the button is greyed out and a click opens the unlock window.
+    // Swoopy Pro is locked: the button is greyed out and a click opens the unlock window.
     var locked = false {
         didSet {
             guard oldValue != locked else { return }
             drawButton()
-            button.toolTip = locked ? "Pitch Shift Pro" : "Add or manage your own voices"
-            button.setAccessibilityHelp(locked ? "Pitch Shift Pro" : nil)
+            button.toolTip = locked ? "Swoopy Pro" : "Add or manage your own voices"
+            button.setAccessibilityHelp(locked ? "Swoopy Pro" : nil)
         }
     }
     private var points: CGFloat = 0
@@ -63,7 +63,7 @@ final class VoiceTools: NSObject {
     // MARK: The menu
 
     @objc private func showMenu() {
-        guard !locked else { app.showUnlock(); return }  // adding voices is part of Pitch Shift Pro
+        guard !locked else { app.showUnlock(); return }  // adding voices is part of Swoopy Pro
         let menu = NSMenu()
         menu.autoenablesItems = false
         add(menu, "Add Voice…", #selector(addVoice))
@@ -187,7 +187,7 @@ final class VoiceTools: NSObject {
         guard let window = app.window else { done(nil); return }
         let alert = NSAlert()
         alert.messageText = "How high is “\(name)”?"
-        alert.informativeText = "Pitch Shift moves your voice to this pitch. High: most women's voices. Low: most men's voices."
+        alert.informativeText = "Swoopy moves your voice to this pitch. High: most women's voices. Low: most men's voices."
         for pitch in VoicePitch.allCases { alert.addButton(withTitle: pitch.title) }
         alert.addButton(withTitle: "Cancel")
         alert.beginSheetModal(for: window) { response in

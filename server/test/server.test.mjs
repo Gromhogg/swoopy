@@ -32,7 +32,7 @@ beforeEach(() => {
     STRIPE_WEBHOOK_SECRET: "whsec_test_secret",
     STRIPE_SECRET_KEY: "rk_test_123",
     RESEND_API_KEY: "re_test_123",
-    EMAIL_FROM: "Pitch Shift <keys@example.com>",
+    EMAIL_FROM: "Swoopy <keys@example.com>",
     ALLOW_TEST_KEYS: "true",
   };
   calls = [];

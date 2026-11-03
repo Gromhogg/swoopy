@@ -1,4 +1,4 @@
-// While "Your voice" is on (or the Soundboard is open), Pitch Shift Mic becomes the Mac's default microphone, so
+// While "Your voice" is on (or the Soundboard is open), Swoopy Mic becomes the Mac's default microphone, so
 // apps set to the default mic (Discord's "Default", Zoom's "Same as System", ...) get the shifted voice. The real mic
 // is put back when the voice is switched off (and the Soundboard closed) or the app quits, and by a small watchdog
 // process if the app ever crashes.
@@ -9,7 +9,7 @@ enum DefaultMic {
     private static let savedKey = "realDefaultMic"  // the real default mic from before we switched
     private static var watchdog: Process?
 
-    // The real mic that was the default before Pitch Shift Mic took over (nil when we haven't taken over).
+    // The real mic that was the default before Swoopy Mic took over (nil when we haven't taken over).
     static var realMic: AudioDeviceID? {
         guard let virtual = Mics.virtualMic, defaultInput() == virtual else { return nil }
         return UserDefaults.standard.string(forKey: savedKey).flatMap { device(uid: $0) } ?? Mics.builtIn

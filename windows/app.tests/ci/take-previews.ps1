@@ -1,5 +1,5 @@
 # GitHub checks only: pictures of the window in many states, light and dark (no sound, no clicking).
-# Uses PitchShift.exe --preview <states> --screenshot <file> (see windows/app/Preview.cs).
+# Uses Swoopy.exe --preview <states> --screenshot <file> (see windows/app/Preview.cs).
 param(
     [Parameter(Mandatory)] [string]$Exe,
     [string]$Out = 'shots',

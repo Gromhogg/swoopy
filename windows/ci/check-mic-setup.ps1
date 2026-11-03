@@ -1,5 +1,5 @@
-# GitHub checks only: checks what "PitchShiftTool setup-mic", "restore-names" and "remove-cable" did,
-# by reading "PitchShiftTool diag". -Expect: named | original | removed
+# GitHub checks only: checks what "SwoopyTool setup-mic", "restore-names" and "remove-cable" did,
+# by reading "SwoopyTool diag". -Expect: named | original | removed
 param(
     [Parameter(Mandatory)] [string]$Tool,
     [Parameter(Mandatory)] [ValidateSet('named', 'original', 'removed')] [string]$Expect,
@@ -18,8 +18,8 @@ $cable | Format-Table direction, state, name | Out-String | Write-Host
 $failures = @()
 switch ($Expect) {
     'named' {
-        if ($mic.Count -ne 1 -or $mic[0].description -ne 'Pitch Shift Mic') { $failures += "recording side should be 'Pitch Shift Mic'" }
-        if (-not ($feeds | Where-Object { $_.description -eq 'Pitch Shift Mic Feed' })) { $failures += "playback side should be 'Pitch Shift Mic Feed'" }
+        if ($mic.Count -ne 1 -or $mic[0].description -ne 'Swoopy Mic') { $failures += "recording side should be 'Swoopy Mic'" }
+        if (-not ($feeds | Where-Object { $_.description -eq 'Swoopy Mic Feed' })) { $failures += "playback side should be 'Swoopy Mic Feed'" }
         if ($feeds | Where-Object { $_.description -like '*16*' }) { $failures += 'the 16-channel input should be hidden' }
         if (-not $diag.cable.present) { $failures += 'the engine should find the cable' }
     }

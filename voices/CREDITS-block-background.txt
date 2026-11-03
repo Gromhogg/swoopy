@@ -1,4 +1,4 @@
-Sounds used to train Pitch Shift's "Block background sounds" voices (3.5; woman_us_r4_ahead and man_r4_ahead).
+Sounds used to train Swoopy's "Block background sounds" voices (3.5; woman_us_r4_ahead and man_r4_ahead).
 These sounds were mixed UNDER the VCTK speech on the voice's input side only (the voice learned to make the clean
 speech without them); they are never in the voice's output and are not part of the app. Plus made-up hiss and hum.
 FSD50K: Fonseca, Favory, Pons, Font, Serra, "FSD50K: an open dataset of human-labeled sound events" (2020/2022),

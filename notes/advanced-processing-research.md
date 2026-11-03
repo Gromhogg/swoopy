@@ -514,7 +514,7 @@ at -8 (mean 0.87 ms, p99 5.6 ms; Auto EQ off: 0.55 ms). Now memories under 1e-20
   range). Readout: 201.8 million reads from another thread while playing, 0 broken values.
 - Engine with `-Wall -Wextra`, portable FFT and vDSP: no warnings; app: no new warnings. Windows DSP tests built on
   the Mac with the portable FFT: 27 of 27 passed (peak -0.30 dBFS).
-- Not run: the one live check (`--test --advanced --auto-eq --watch` on a quiet tone). The owner's Pitch Shift app
+- Not run: the one live check (`--test --advanced --auto-eq --watch` on a quiet tone). The owner's Swoopy app
   was running for the whole 10 minutes it waited, so nothing was played or recorded.
 
 **Review notes** (engine and Swift glue): no memory or locks on the sound path; the readout is a sequence lock over
@@ -548,9 +548,9 @@ All at the same loudness (-18 LUFS). README.txt in the folder says what to liste
 
 ## Checks
 
-- `PitchShift --render-file IN OUT --steps N [--advanced] [--steps-at "4:8,8:-5"]`: shift a file with the app's own
+- `Swoopy --render-file IN OUT --steps N [--advanced] [--steps-at "4:8,8:-5"]`: shift a file with the app's own
   code (normal or advanced); `--steps-at` changes the amount while it plays.
-- `PitchShift --test --pid N --steps N --advanced --watch [--record-out F.wav] [--steps-at ...]`: live test with a
+- `Swoopy --test --pid N --steps N --advanced --watch [--record-out F.wav] [--steps-at ...]`: live test with a
   quiet tone; prints the delay parts every half second; `--record-out` saves what Advanced processing played.
 - Bass fix measurements: the harness, scripts and test-clip maker are in the git-ignored `research/advanced/bass/`
   (`advrender.cpp` renders like `--render-file --advanced` with `advanced_tune` settings; `run.py` renders all clips

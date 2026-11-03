@@ -1,18 +1,18 @@
 #!/usr/bin/env python3
-"""Turns a downloaded RVC v2 voice (a .pth file, or a .zip with one inside) into a Pitch Shift voice folder.
+"""Turns a downloaded RVC v2 voice (a .pth file, or a .zip with one inside) into a Swoopy voice folder.
 
   python3 convert_voice.py MODEL.pth [--name NAME] [--pitch high|medium|low|HZ] [--voices-dir DIR] [--app APP]
                            [--ahead-ms 700]
 
 Writes DIR/<id>/ (default DIR: ~/Library/Application Support/Pitch Shift/Voices):
   voice.json      the voice's name, its Natural mode settings (from --pitch) and its AI voice; credits = the file name
-  <id>.mlmodelc   the AI voice, Core ML with 8-bit weights, made for Pitch Shift's AI voice ("Faster <-> More real")
-Pitch Shift's own speech reader (contentvec_ahead.mlmodelc, inside the app) is used with it, so it is not copied.
+  <id>.mlmodelc   the AI voice, Core ML with 8-bit weights, made for Swoopy's AI voice ("Faster <-> More real")
+Swoopy's own speech reader (contentvec_ahead.mlmodelc, inside the app) is used with it, so it is not copied.
 
-The AI voice is made in the look-ahead shape of Pitch Shift 3.1 (as research/voicechanger/convert/convert_generator.py
+The AI voice is made in the look-ahead shape of Swoopy 3.1 (as research/voicechanger/convert/convert_generator.py
 --context-ms 1000 --ahead-ms 700 --right-ms 40): one file serves every look-ahead from 0 to 700 ms; the window is
 1.92 s (T 192 frames), the flow runs over all of it and the decoder only on the 31 frames the app picks (input
-"pick"). --ahead-ms 0 makes the first shape instead (Pitch Shift 3.0, contentvec.mlmodelc; no look-ahead).
+"pick"). --ahead-ms 0 makes the first shape instead (Swoopy 3.0, contentvec.mlmodelc; no look-ahead).
 
 Accepts RVC v2 voices made at 32, 40 or 48 kHz (RVC WebUI, Applio and their forks). Refuses RVC v1 voices and
 voices made without pitch. Usually run by tools/convert-voice.sh, which sets up Python and the packages first.
@@ -44,7 +44,7 @@ import torch.nn.functional as F
 # ------------------------------------------------------------------------------------------- the window layout
 
 # All in 10 ms frames. The app's built-in voices use a 160 ms hop with 1 s of past sound, plus (look-ahead shape,
-# Pitch Shift 3.1) up to 700 ms of look-ahead in the same window, and 40 ms decoded after each piece and dropped
+# Swoopy 3.1) up to 700 ms of look-ahead in the same window, and 40 ms decoded after each piece and dropped
 # (context 1710 ms after rounding T to an even number: T 192). The window is read from the app's speech reader
 # (contentvec_ahead.mlmodelc) when it can be found.
 HOP_MS, XFADE_MS, SOLA_MS, MARGIN_MS, DEFAULT_CONTEXT_MS = 160, 40, 10, 60, 1000
@@ -71,7 +71,8 @@ def window_layout(hop_ms=HOP_MS, context_ms=DEFAULT_CONTEXT_MS, xfade_ms=XFADE_M
 
 def app_window_frames(app, reader="contentvec_ahead.mlmodelc"):
     """T (10 ms frames) of the app's speech reader, from <reader>/model.mil ("audio" is [1, T*160]), and the app."""
-    for base in [app, "/Applications/Pitch Shift.app", os.path.expanduser("~/Applications/Pitch Shift.app")]:
+    for base in [app, "/Applications/Swoopy.app", os.path.expanduser("~/Applications/Swoopy.app"),
+                 "/Applications/Pitch Shift.app", os.path.expanduser("~/Applications/Pitch Shift.app")]:
         if not base:
             continue
         mil = os.path.join(base, "Contents/Resources/Voices", reader, "model.mil")
@@ -127,20 +128,20 @@ def load_checkpoint(path):
         raise Refused("%s isn't an RVC voice model this converter knows." % os.path.basename(path))
     version = str(c.get("version", "")).lower()
     if version == "v1" or sd["enc_p.emb_phone.weight"].shape[1] == 256:
-        raise Refused("%s is an RVC v1 voice. Pitch Shift needs RVC v2 voices (most voices made since mid-2023 are v2): "
+        raise Refused("%s is an RVC v1 voice. Swoopy needs RVC v2 voices (most voices made since mid-2023 are v2): "
                       "look for a v2 version of this voice." % os.path.basename(path))
     if sd["enc_p.emb_phone.weight"].shape[1] != 768:
-        raise Refused("%s has an unusual speech input (%d values); Pitch Shift needs a standard RVC v2 voice."
+        raise Refused("%s has an unusual speech input (%d values); Swoopy needs a standard RVC v2 voice."
                       % (os.path.basename(path), sd["enc_p.emb_phone.weight"].shape[1]))
     if str(c.get("f0", 1)) in ("0", "False") or "enc_p.emb_pitch.weight" not in sd:
-        raise Refused("%s was made without pitch (an RVC \"no f0\" voice). Pitch Shift needs a voice made with pitch."
+        raise Refused("%s was made without pitch (an RVC \"no f0\" voice). Swoopy needs a voice made with pitch."
                       % os.path.basename(path))
     vocoder = str(c.get("vocoder", "HiFi-GAN"))
     if vocoder not in ("HiFi-GAN", "hifigan", ""):
-        raise Refused("%s uses the %s sound maker; Pitch Shift only runs RVC's standard one (HiFi-GAN)." % (os.path.basename(path), vocoder))
+        raise Refused("%s uses the %s sound maker; Swoopy only runs RVC's standard one (HiFi-GAN)." % (os.path.basename(path), vocoder))
     embedder = str(c.get("embedder_model", "contentvec")).lower()
     if embedder not in ("contentvec", "hubert", "hubert_base", "custom", ""):
-        raise Refused("%s was made with the %s speech reader; Pitch Shift's reader is ContentVec (RVC's standard)."
+        raise Refused("%s was made with the %s speech reader; Swoopy's reader is ContentVec (RVC's standard)."
                       % (os.path.basename(path), embedder))
     cfg = c.get("config")
     sr = c.get("sr")
@@ -152,7 +153,7 @@ def load_checkpoint(path):
         rks, rds = list(cfg[10]), [list(d) for d in cfg[11]]
         std = dict(inter=cfg[2], hidden=cfg[3], filt=cfg[4], heads=cfg[5], layers=cfg[6], kernel=cfg[7], resblock=str(cfg[9]), gin=cfg[16])
         if std != dict(inter=192, hidden=192, filt=768, heads=2, layers=6, kernel=3, resblock="1", gin=256):
-            raise Refused("%s has an unusual model size (%s); Pitch Shift needs a standard RVC v2 voice." % (os.path.basename(path), std))
+            raise Refused("%s has an unusual model size (%s); Swoopy needs a standard RVC v2 voice." % (os.path.basename(path), std))
     else:  # a base model ({'model'}): sizes from the first upsampler
         k0 = sd.get("dec.ups.0.weight_v", sd.get("dec.ups.0.parametrizations.weight.original1")).shape[2]
         sr = sr or {24: 48000, 20: 32000, 16: 40000}.get(k0)
@@ -160,7 +161,7 @@ def load_checkpoint(path):
         upk = {48000: [24, 20, 4, 4], 40000: [16, 16, 4, 4], 32000: [20, 16, 4, 4]}.get(sr)
         init_ch, rks, rds = 512, [3, 7, 11], [[1, 3, 5]] * 3
     if sr not in (32000, 40000, 48000):
-        raise Refused("%s was made at %s Hz; Pitch Shift can use voices made at 32, 40 or 48 kHz." % (os.path.basename(path), sr))
+        raise Refused("%s was made at %s Hz; Swoopy can use voices made at 32, 40 or 48 kHz." % (os.path.basename(path), sr))
     if int(np.prod(ups)) != sr // 100:
         raise Refused("%s has an unusual sound maker (%s for %d Hz)." % (os.path.basename(path), ups, sr))
     params = dict(inter_channels=192, hidden_channels=192, filter_channels=768, n_heads=2, n_layers=6, kernel_size=3,
@@ -431,7 +432,7 @@ class RVCGenerator(nn.Module):
 
 
 class AheadGenerator(nn.Module):
-    """The look-ahead shape (Pitch Shift 3.1): features (1, T/2, 768), pitch (1, T), source (1, 1, DEC*upp),
+    """The look-ahead shape (Swoopy 3.1): features (1, T/2, 768), pitch (1, T), source (1, 1, DEC*upp),
     noise (1, 192, T), pick (DEC) consecutive window frame numbers (oldest = 0) -> audio (1, DEC*upp) of the picked
     frames. The text encoder and the flow run over the whole window (cheap), the decoder only on the picked frames, so
     the app chooses per piece how far from the newest end its sound comes (the look-ahead) with one file."""
@@ -524,7 +525,7 @@ def convert(g, L, work, compiled_dst):
                     minimum_deployment_target=ct.target.macOS14, convert_to="mlprogram",
                     compute_precision=ct.precision.FLOAT16)
     ml = quantize(ml)
-    ml.short_description = "RVC v2 voice for Pitch Shift, %d Hz, hop %d ms: T %d, DEC %d, FLOW %d%s" % (
+    ml.short_description = "RVC v2 voice for Swoopy, %d Hz, hop %d ms: T %d, DEC %d, FLOW %d%s" % (
         g.sr, L["H"] * 10, T, DEC, FLOW, ", look-ahead up to %d ms" % (L["A"] * 10) if L["A"] else "")
     meta = {"rate": str(g.sr), "upp": str(g.upp), "window_frames": str(T), "dec_frames": str(DEC),
             "flow_frames": str(FLOW), "hop_ms": str(L["H"] * 10), "context_ms": str(L["C"] * 10),
@@ -594,21 +595,21 @@ def slug(name):
 
 
 def voices_readme():
-    return """Pitch Shift voices
+    return """Swoopy voices
 
-Each voice is a folder in here (or a .zip of one you add with Add Voice...). Pitch Shift lists them in the Voice
+Each voice is a folder in here (or a .zip of one you add with Add Voice...). Swoopy lists them in the Voice
 changer's voice menu.
 
 A voice folder holds:
-- voice.json: the voice's name and settings. Pitch Shift writes it for you when you add a voice.
+- voice.json: the voice's name and settings. Swoopy writes it for you when you add a voice.
 - a .mlmodelc folder (optional): the AI voice (Macs with Apple silicon). Without one, the voice
   uses the plain voice changer.
 
 To add a voice:
 - Downloaded an RVC v2 voice (a .pth file, or a .zip with one inside)? Turn it into a voice folder with the one line
-  under "Your own voices" in Pitch Shift's README (https://github.com/Gromhogg/pitch-shift#your-own-voices). The new
+  under "Your own voices" in Swoopy's README (https://github.com/Gromhogg/swoopy#your-own-voices). The new
   voice lands in here.
-- Got a voice folder, or a .zip of one? In Pitch Shift's Voice changer, click the button next to the voice menu and
+- Got a voice folder, or a .zip of one? In Swoopy's Voice changer, click the button next to the voice menu and
   choose Add Voice..., or drop the folder in here.
 
 To remove a voice, choose Remove in the same menu, or move its folder to the Trash.
@@ -642,14 +643,14 @@ def find_pth(path, work):
 
 
 def main():
-    ap = argparse.ArgumentParser(description="Turns an RVC v2 voice (.pth) into a Pitch Shift voice folder.")
+    ap = argparse.ArgumentParser(description="Turns an RVC v2 voice (.pth) into a Swoopy voice folder.")
     ap.add_argument("model", help="the voice's .pth file (or a .zip with one inside)")
-    ap.add_argument("--name", help="the name shown in Pitch Shift (default: the file's name)")
+    ap.add_argument("--name", help="the name shown in Swoopy (default: the file's name)")
     ap.add_argument("--pitch", default="medium", help="how high the voice is: high (most women's voices), medium, low (most men's voices), or Hz")
     ap.add_argument("--voices-dir", default=os.path.expanduser("~/Library/Application Support/Pitch Shift/Voices"))
-    ap.add_argument("--app", default=None, help="Pitch Shift.app to match (default: the one in Applications)")
+    ap.add_argument("--app", default=None, help="Swoopy.app to match (default: the one in Applications)")
     ap.add_argument("--ahead-ms", type=int, default=DEFAULT_AHEAD_MS, choices=range(0, 1001, 10), metavar="MS",
-                    help="the most look-ahead the voice can use (700, Pitch Shift 3.1); 0 = the first shape (Pitch Shift 3.0)")
+                    help="the most look-ahead the voice can use (700, Swoopy 3.1); 0 = the first shape (Swoopy 3.0)")
     a = ap.parse_args()
     path = os.path.abspath(os.path.expanduser(a.model))
     if not os.path.isfile(path):
@@ -665,9 +666,9 @@ def main():
         if T and T != L["T"]:
             L = window_layout(context_ms=(T - L["X"] - L["S"] - L["H"]) * 10 - a.ahead_ms, ahead_ms=a.ahead_ms)
             if L["T"] != T:
-                raise Refused("this Pitch Shift's speech reader has an unexpected size (%d frames)" % T)
+                raise Refused("this Swoopy's speech reader has an unexpected size (%d frames)" % T)
         if not T and a.ahead_ms and app_window_frames(a.app, "contentvec.mlmodelc")[0]:
-            print("Note: the Pitch Shift on this Mac is older than 3.1. Update it to use this voice.")
+            print("Note: the app on this Mac is older than 3.1. Install the newest Swoopy to use this voice.")
         name = (a.name or os.path.splitext(os.path.basename(path))[0]).strip()[:60] or "Voice"
         base = slug(name)
         os.makedirs(a.voices_dir, exist_ok=True)
@@ -693,7 +694,7 @@ def main():
             "version": 1,
             "natural": natural,
             "realistic": {"model": model_name, "encoder": reader, "rate": params["sr"], "eqAmount": 0.5},
-            "credits": "Converted from %s with Pitch Shift's voice converter (RVC v2, %d kHz)." % (shown, params["sr"] // 1000),
+            "credits": "Converted from %s with Swoopy's voice converter (RVC v2, %d kHz)." % (shown, params["sr"] // 1000),
         }
         with open(os.path.join(stage, "voice.json"), "w") as f:
             json.dump(manifest, f, indent=2)
@@ -702,7 +703,7 @@ def main():
         shutil.move(stage, dst)
         print("Check: the converted voice matches the original (%.0f dB clear of differences; 15 or more is fine). %.0f s." % (snr, time.time() - t0))
         print("Done: \"%s\" is in %s" % (name, dst))
-        print("In Pitch Shift: Voice changer -> pick \"%s\" in the voice menu, and move Faster ↔ More real right of Faster." % name)
+        print("In Swoopy: Voice changer -> pick \"%s\" in the voice menu, and move Faster ↔ More real right of Faster." % name)
     finally:
         shutil.rmtree(work, ignore_errors=True)
 

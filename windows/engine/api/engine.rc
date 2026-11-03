@@ -10,12 +10,12 @@ BEGIN
   BEGIN
     BLOCK "040904B0"
     BEGIN
-      VALUE "FileDescription", "Pitch Shift sound engine"
+      VALUE "FileDescription", "Swoopy sound engine"
       VALUE "FileVersion", "2.0.0"
-      VALUE "ProductName", "Pitch Shift"
+      VALUE "ProductName", "Swoopy"
       VALUE "ProductVersion", "2.0.0 beta"
       VALUE "LegalCopyright", "GPL-3.0-or-later"
-      VALUE "OriginalFilename", "PitchShiftEngine.dll"
+      VALUE "OriginalFilename", "SwoopyEngine.dll"
     END
   END
   BLOCK "VarFileInfo"

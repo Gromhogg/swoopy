@@ -70,7 +70,7 @@ int remove_cable(const Args&) {
     return code;
 }
 
-// Waits for Pitch Shift (process `pid`) to end, then puts every app volume back. Started by the app,
+// Waits for Swoopy (process `pid`) to end, then puts every app volume back. Started by the app,
 // so volumes come back even if the app crashes or is ended from Task Manager.
 int watch(const Args& args) {
     const DWORD pid = DWORD(std::stoul(args.positional(0, L"0")));

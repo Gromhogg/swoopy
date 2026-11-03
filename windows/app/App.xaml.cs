@@ -4,20 +4,20 @@ using Microsoft.Win32;
 
 namespace PitchShift;
 
-// Starts Pitch Shift. Options:
+// Starts Swoopy. Options:
 //   (none)                          open the window (or bring the running one to the front)
-//   --quit                          ask the running Pitch Shift to quit (the installer uses this)
+//   --quit                          ask the running Swoopy to quit (the installer uses this)
 //   --diag [--out file]             write a diagnostics report (Desktop by default)
 //   --preview states --screenshot f picture of a made-up state, no sound (see Preview.cs)
 //   --theme light|dark              force light or dark colors
 //   --size WxH                      start with this window size (inside the frame)
-//   --shot file                     ask the running Pitch Shift for a picture of its window
+//   --shot file                     ask the running Swoopy for a picture of its window
 public partial class App : Application
 {
     public static bool Quitting { get; private set; }
     internal static Tray? Tray { get; private set; }
 
-    static Mutex? oneCopy;  // kept for the whole run: "Pitch Shift is already open"
+    static Mutex? oneCopy;  // kept for the whole run: "Swoopy is already open"
     MainWindow? window;
     IDisposable? server;
 
@@ -66,7 +66,7 @@ public partial class App : Application
         window.Show();
     }
 
-    // Makes sure only one Pitch Shift runs. Gives false (and ends this copy) if another one is open.
+    // Makes sure only one Swoopy runs. Gives false (and ends this copy) if another one is open.
     bool TakeOver(Args args)
     {
         oneCopy = new Mutex(true, SingleInstance.MutexName, out var first);
@@ -92,7 +92,7 @@ public partial class App : Application
         return false;
     }
 
-    // Commands from another copy of Pitch Shift (see SingleInstance).
+    // Commands from another copy of Swoopy (see SingleInstance).
     (string, Action?) Handle(string command)
     {
         if (command == "show")

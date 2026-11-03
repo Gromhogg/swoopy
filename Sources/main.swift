@@ -1,23 +1,22 @@
-// Pitch Shift: plays an app's sound (or all sound) and/or your voice at a higher or lower pitch, live.
-// Checks from Terminal (inside "Pitch Shift.app/Contents/MacOS/PitchShift"):
-//   --list                                     sound devices (with model UIDs; and which are in use), Pitch Shift Mic,
+// Swoopy: plays an app's sound (or all sound) and/or your voice at a higher or lower pitch, live.
+// Checks from Terminal (inside "Swoopy.app/Contents/MacOS/Swoopy"):
+//   --list                                     sound devices (with model UIDs; and which are in use), Swoopy Mic,
 //                                              the saved Bass ↔ Treble and Auto EQ per output, the voice's mic, and
 //                                              which app each sound process belongs to
 //   --watch-output [--seconds 10]              once a second: the output's sample rate (Bluetooth call mode shows
 //                                              8000-24000 Hz), its own mic, and which apps record from which devices
-// The device tests (--test, --test-voice, --test-button, --test-sounds, --test-default-mic) refuse to start while Pitch
-// Shift Mic, the built-in mic or a Bluetooth mic is in use by another app (for example a call), or the Pitch Shift app
-// is open.
+// The device tests (--test, --test-voice, --test-button, --test-sounds, --test-default-mic) refuse to start while Swoopy
+// Mic, the built-in mic or a Bluetooth mic is in use by another app (for example a call), or the Swoopy app is open.
 //   --test [--pid N | --app BUNDLE_ID | --all] [--steps 2.5] [--seconds S]     "What you hear" for a few seconds
 //   --test-voice [--mic NAME] [--tone 440 | --file F] [--steps 3] [--cartoon | --cartoon-amount 0.5] [--seconds S]
 //                [--slow-deeper] [--out F.caf] [--watch] [--buffer N]
-//                                              sends a tone or file through the voice chain and records Pitch Shift Mic
+//                                              sends a tone or file through the voice chain and records Swoopy Mic
 //                                              (voice style from 0 = Natural, the default, to 1 = Cartoon; --cartoon = 1;
 //                                              --slow-deeper turns on "Deeper when slow" and prints the speaking rate
 //                                              and the extra shift once a second).
 //                                              --watch: the tone plays for half of every second; once a second it prints
 //                                              the sound waiting to go out, the dry-outs/trims/replays and the delay from
-//                                              the mic to Pitch Shift Mic (the delay parts are printed at the start).
+//                                              the mic to Swoopy Mic (the delay parts are printed at the start).
 //                                              --buffer N: callback size to ask for (default 128, or 256 above 48 kHz)
 //                                              --voice Woman [--strength S] [--realism R] [--changer-tune ...]
 //                                              [--changer-stats] [--compute cpu|gpu|ane|all]: with the voice changer
@@ -50,7 +49,7 @@
 //   --render-sounds VOICE OUT --sound FILE [--at 5,20] [--sound-volume 1] [--speakers] [--voice-db 0] [--shifted]
 //                [--buffer 128] [--sound-preset old]
 //                                              Soundboard, offline (no devices): VOICE as the mic, FILE clicked at each
-//                                              --at second, OUT = what Pitch Shift Mic would send (the chain's own
+//                                              --at second, OUT = what Swoopy Mic would send (the chain's own
 //                                              mixing); prints the highest sample, how many samples are near full
 //                                              scale, and how long the mixing takes per callback (--sound-preset old:
 //                                              as in 2.0.2, before the limiter, fades and loudness cap)
@@ -62,15 +61,15 @@
 //                                              is ready; --steps is not used with --voice: only one at a time)
 //   --test-sounds FILE [--speakers] [--seconds S] [--out F.caf] [--mic NAME] [--steps 3] [--volume 0.05] [--hear 0.02]
 //                [--sound-volume 0.5] [--voice-off] [--voice Woman [--realism R | --quality realistic]]
-//                                              Soundboard: plays FILE into Pitch Shift Mic 1 s in, with a quiet tone as
-//                                              the voice, records Pitch Shift Mic and checks it (one copy of the sound,
+//                                              Soundboard: plays FILE into Swoopy Mic 1 s in, with a quiet tone as
+//                                              the voice, records Swoopy Mic and checks it (one copy of the sound,
 //                                              its level; --speakers: as if on the Mac's speakers, so the voice must
 //                                              stop while it plays). --hear: also play it here at that volume.
 //                                              --recording F.caf: check a recording saved with --out (no devices).
 //                                              --stop-after S: press Stop S seconds after the sound starts.
 //                                              --hear-out F.caf: save the owner's copy (with --hear).
 //                                              --sound-volume V: the sound's own volume (0 ... 1.5, Volume… on its
-//                                              button), so its level in Pitch Shift Mic should be V x the file.
+//                                              button), so its level in Swoopy Mic should be V x the file.
 //                                              --voice-off: as with "Your voice" off and the Soundboard open: the
 //                                              tone must come through at its own pitch (440 Hz), no shift.
 //   --test ... --advanced [--record-out F.wav] [--steps-at "3:8,6:-5"] [--tone-amount 0.5] [--tone-at "2:1,4:-1"]
@@ -91,9 +90,9 @@
 //                                              no Voice changer; the options for those are ignored (one note says
 //                                              which), and --render-sounds, --test-sounds (the Soundboard) and
 //                                              --add-voice, --rename-voice, --remove-voice stop with a message.
-//                                              A copy with Pitch Shift Pro locked always plays this way, like the
-//                                              window ("Pitch Shift Pro is locked: ... ignored (free version)").
-// Pitch Shift Pro (Sources/Pro.swift, notes/paid-unlock-plan.md):
+//                                              A copy with Swoopy Pro locked always plays this way, like the
+//                                              window ("Swoopy Pro is locked: ... ignored (free version)").
+// Swoopy Pro (Sources/Pro.swift, notes/paid-unlock-plan.md):
 //   --pro-status                               locked or unlocked, and why
 //   --pro-key KEY                              unlocks with a key, like the unlock window (checks it on this Mac, no
 //                                              internet, and keeps it)
@@ -137,7 +136,7 @@ func arg(_ name: String) -> String? {
 // switch off (its settings as given); click-voice / click-vc turn Your voice's / the Voice changer's switch on half
 // a second in, as a click
 // would (the other one goes off); resize drags the window's corner through the three layouts; pro-locked shows
-// Pitch Shift Pro locked, pro-unlocked unlocked (the default for pictures), pro-unlock the unlock window, with pro-typo
+// Swoopy Pro locked, pro-unlocked unlocked (the default for pictures), pro-unlock the unlock window, with pro-typo
 // a key with a typo in it, with pro-paste a key pasted from an email (line breaks and spaces in it), with pro-done
 // the "Unlocked" message, with pro-alone as its own window instead of a sheet;
 // switch-flip shows the switches slowed down 10 times: the first card's goes on and turns back halfway, the second
@@ -145,13 +144,13 @@ func arg(_ name: String) -> String? {
 let preview = arg("--preview")
 let previewStates = Set((preview ?? "").split(separator: ",").map(String.init))
 
-// Pitch Shift Pro. Checks only: --pro-file F keeps the key in F (see --pro-public-key below).
+// Swoopy Pro. Checks only: --pro-file F keeps the key in F (see --pro-public-key below).
 if let path = arg("--pro-file") { Pro.shared.file = URL(fileURLWithPath: path) }
 // There is no unlock server and no key secret any more (keys are signed, and checked on the Mac); an old test script
 // stops here instead of opening the window.
 if args.contains("--pro-server") { print("--pro-server: there is no server any more (keys are checked on this Mac)"); exit(1) }
 if args.contains("--pro-secret") { print("--pro-secret: there is no key secret any more (keys are signed); see --pro-public-key"); exit(1) }
-// While Pitch Shift Pro is locked (a build with the public key and no key that works), every mode below plays as the
+// While Swoopy Pro is locked (a build with the public key and no key that works), every mode below plays as the
 // free version does, like the window (see Free): the options for paid features are ignored with one note, and the
 // Soundboard modes and adding voices stop here, before any device is touched. --as-free does the same in any copy
 // (for comparing). Pictures (--preview) show the state they're asked for instead and play nothing.
@@ -159,12 +158,12 @@ if preview == nil { Pro.shared.load() }
 let proLocked = preview == nil && !Pro.shared.unlocked
 let asFree = preview == nil && (proLocked || args.contains("--as-free"))
 if asFree {
-    let why = proLocked ? "Pitch Shift Pro is locked" : "--as-free"
+    let why = proLocked ? "Swoopy Pro is locked" : "--as-free"
     if let mode = ["--render-sounds", "--test-sounds"].first(where: args.contains) {
-        print("\(why): the Soundboard is part of Pitch Shift Pro, so \(mode) doesn't run (free version)."); exit(1)
+        print("\(why): the Soundboard is part of Swoopy Pro, so \(mode) doesn't run (free version)."); exit(1)
     }
     if let mode = ["--add-voice", "--rename-voice", "--remove-voice"].first(where: args.contains) {
-        print("\(why): your own voices are part of Pitch Shift Pro, so \(mode) doesn't run (free version)."); exit(1)
+        print("\(why): your own voices are part of Swoopy Pro, so \(mode) doesn't run (free version)."); exit(1)
     }
     // The Voice changer, Natural ↔ Cartoon, Deeper when slow and Higher when fast, Bass ↔ Treble, Auto EQ.
     let paid = ["--voice", "--strength", "--realism", "--quality", "--changer-tune", "--changer-stats", "--block-background",
@@ -254,7 +253,7 @@ let changerTuneArg: [(String, Float)] = (arg("--changer-tune") ?? "").split(sepa
     return (parts[0].trimmingCharacters(in: .whitespaces), value)
 }
 // The voice asked for with --voice (nil without --voice; stops with a message if it can't be used). The free version
-// (asFree): none (the Voice changer is part of Pitch Shift Pro).
+// (asFree): none (the Voice changer is part of Swoopy Pro).
 let changerArg: ChangerOptions? = {
     guard let name = arg("--voice"), !asFree else { return nil }
     guard let entry = VoiceLibrary.shared.voice(name) else {
@@ -390,10 +389,10 @@ if let i = args.firstIndex(where: { $0 == "--rename-voice" || $0 == "--remove-vo
 // The watchdog: a second copy of the app that gives the real mic back if the app ends without doing it.
 if let pid = arg("--watchdog").flatMap({ pid_t($0) }) { DefaultMic.watch(pid) }
 
-// Device tests share the Mac's microphones and Pitch Shift Mic with whatever the owner is doing. They only start
-// when Pitch Shift Mic, the built-in mic and every Bluetooth mic are idle (not used by any app, for example a call
-// in FaceTime, Discord or a browser), and the Pitch Shift app itself isn't open: with "Your voice" on, a test
-// reading Pitch Shift Mic would wake the app's voice on the real mic, and the Test playback would send that to the
+// Device tests share the Mac's microphones and Swoopy Mic with whatever the owner is doing. They only start
+// when Swoopy Mic, the built-in mic and every Bluetooth mic are idle (not used by any app, for example a call
+// in FaceTime, Discord or a browser), and the Swoopy app itself isn't open: with "Your voice" on, a test
+// reading Swoopy Mic would wake the app's voice on the real mic, and the Test playback would send that to the
 // owner's headphones. Otherwise they stop right away, before touching any device.
 func refuseIfMicsBusy() {
     let me = ProcessInfo.processInfo.processIdentifier
@@ -401,7 +400,7 @@ func refuseIfMicsBusy() {
     let names = Set([Bundle.main.bundleIdentifier ?? "local.pitch-shift", "local.pitch-shift"])
     if names.flatMap({ NSRunningApplication.runningApplications(withBundleIdentifier: $0) })
         .contains(where: { $0.processIdentifier != me }) {
-        print("Not starting: the Pitch Shift app is open (its voice or sound would mix into the test). Nothing was changed; try again later.")
+        print("Not starting: the Swoopy app is open (its voice or sound would mix into the test). Nothing was changed; try again later.")
         exit(2)
     }
     let busy = allDevices().filter { id in
@@ -437,7 +436,7 @@ func testVoiceFile(_ path: String, rate: Double) -> [Float] {
 if ["--test", "--test-voice", "--test-button", "--test-default-mic"].contains(where: { args.contains($0) })
     || (args.contains("--test-sounds") && !args.contains("--recording")) { refuseIfMicsBusy() }
 
-// Makes Pitch Shift Mic the default mic and then waits, so a test can force-quit it and check the watchdog.
+// Makes Swoopy Mic the default mic and then waits, so a test can force-quit it and check the watchdog.
 if args.contains("--test-default-mic") {
     DefaultMic.takeOver()
     print("default mic now: \(deviceName(defaultInput()))")
@@ -471,9 +470,9 @@ if args.contains("--list") {
             + (id == out ? " [default output]" : ""))
     }
     if let mic = Mics.virtualMic, let feed = Mics.virtualFeed {
-        print("Pitch Shift Mic: \(mic) (\(Int(nominalRate(mic))) Hz, in use: \(isRunningSomewhere(mic))), hidden feed: \(feed) (hidden: \(getValue(feed, kAudioDevicePropertyIsHidden, default: UInt32(0)) != 0))")
+        print("Swoopy Mic: \(mic) (\(Int(nominalRate(mic))) Hz, in use: \(isRunningSomewhere(mic))), hidden feed: \(feed) (hidden: \(getValue(feed, kAudioDevicePropertyIsHidden, default: UInt32(0)) != 0))")
     } else {
-        print("Pitch Shift Mic: not installed")
+        print("Swoopy Mic: not installed")
     }
     print("Microphones to choose from: \(Mics.list().map(\.name))")
     let picked = Mics.choose(nil)
@@ -670,7 +669,7 @@ if let input = arg("--render-voice") {
 }
 
 // Soundboard, offline: VOICE (one channel used) as the mic, FILE clicked at each --at time, written to OUT as what
-// Pitch Shift Mic would send. --voice-db: the voice's level change first (a quiet or loud mic); --shifted: the voice
+// Swoopy Mic would send. --voice-db: the voice's level change first (a quiet or loud mic); --shifted: the voice
 // file already went through the pitch change (--render-voice), so it's treated like the shifted voice.
 if let input = arg("--render-sounds") {
     let i = args.firstIndex(of: "--render-sounds")!
@@ -767,7 +766,7 @@ if args.contains("--test-voice") {
         voice.changerTune = changerArg.tune
         voice.changer = ChangerSettings(on: true, quiet: changerArg.quiet, voiceID: entry.id, strength: changerArg.strength, realism: realismArg)
     }
-    guard let mic = voice.currentMic, let virtualMic = Mics.virtualMic else { print("No mic or Pitch Shift Mic not installed"); exit(1) }
+    guard let mic = voice.currentMic, let virtualMic = Mics.virtualMic else { print("No mic or Swoopy Mic not installed"); exit(1) }
     let rate = nominalRate(mic)
     let seconds = arg("--seconds").flatMap(Double.init) ?? 3
     var usage = rusage()
@@ -821,14 +820,14 @@ if args.contains("--test-voice") {
                      card, card * 1000, mic * 1000, (card - mic) * 1000))
     }
     let recorder = try! Recorder(device: virtualMic, seconds: seconds)
-    var delays: [Double] = []  // --watch: mic to Pitch Shift Mic, once per tone start (ms)
+    var delays: [Double] = []  // --watch: mic to Swoopy Mic, once per tone start (ms)
     if watch {
         print(chain.delayParts)
         let started = Date()
         var scanned = 0, quiet = 0, matched = 0
         func ms(_ frames: Int) -> Double { Double(frames) / chain.sampleRate * 1000 }
         func look() {
-            // New tone starts heard in Pitch Shift Mic: loud after at least 0.15 s of quiet.
+            // New tone starts heard in Swoopy Mic: loud after at least 0.15 s of quiet.
             let heard = recorder.recorded(from: scanned)
             let base = Double(AudioConvertHostTimeToNanos(recorder.firstInputTime)) / 1e9
             for (k, x) in heard.enumerated() {
@@ -860,7 +859,7 @@ if args.contains("--test-voice") {
             line += String(format: " | margin %.1f ms | dry-outs %d, trims %d (%.0f ms), replays %d (%.0f ms), overloads %d",
                            ms(s.margin), s.dryOuts, s.trims, ms(s.trimmed), s.replays, ms(s.replayed), s.overloads)
             if tone != nil || watchFile {
-                line += delays.last.map { String(format: " | mic to Pitch Shift Mic %.0f ms", $0) } ?? " | mic to Pitch Shift Mic -"
+                line += delays.last.map { String(format: " | mic to Swoopy Mic %.0f ms", $0) } ?? " | mic to Swoopy Mic -"
             }
             print(line)
             if s.changing { print(changerStatsLine(s.changer, seconds: Date().timeIntervalSince(started).rounded())) }
@@ -930,7 +929,7 @@ if args.contains("--test-voice") {
             }
         }
         if tone != nil, let heard = recorded.firstIndex(where: { abs($0) > 0.02 }), chain.firstInputTime > 0, recorder.firstInputTime > 0 {
-            // From the tone starting at the mic to it coming out of Pitch Shift Mic.
+            // From the tone starting at the mic to it coming out of Swoopy Mic.
             let toneAt = Double(AudioConvertHostTimeToNanos(chain.firstInputTime)) / 1e9 + Double(toneStart) / rate
             let heardAt = Double(AudioConvertHostTimeToNanos(recorder.firstInputTime)) / 1e9 + Double(heard) / recorder.sampleRate
             line += String(format: " delay=%.0fms", (heardAt - toneAt) * 1000)
@@ -950,7 +949,7 @@ if args.contains("--test-voice") {
         print(line)
         if !delays.isEmpty {
             let sorted = delays.sorted()
-            print(String(format: "watch: mic to Pitch Shift Mic %.0f..%.0f ms (median %.0f) over %d %@ starts (first %.0f, last %.0f)",
+            print(String(format: "watch: mic to Swoopy Mic %.0f..%.0f ms (median %.0f) over %d %@ starts (first %.0f, last %.0f)",
                          delays.min()!, delays.max()!, sorted[sorted.count / 2], delays.count, watchFile ? "sound" : "tone",
                          delays.first!, delays.last!))
         }
@@ -967,7 +966,7 @@ if args.contains("--test-voice") {
     dispatchMain()
 }
 
-// Presses the Test button with a quiet tone as the "voice": records 5 s from Pitch Shift Mic, then plays it back.
+// Presses the Test button with a quiet tone as the "voice": records 5 s from Swoopy Mic, then plays it back.
 // --voice NAME [--quality realistic]: with the voice changer on, so it records the changed voice (Realistic: Test is
 // pressed once the AI voice is ready). --file F: a speech file (looped, its loudest point at --volume) instead of the
 // tone.
@@ -1017,7 +1016,7 @@ if args.contains("--test-button") {
     dispatchMain()
 }
 
-// Soundboard check: a quiet tone is the voice, FILE plays into Pitch Shift Mic 1 s in, Pitch Shift Mic is recorded.
+// Soundboard check: a quiet tone is the voice, FILE plays into Swoopy Mic 1 s in, Swoopy Mic is recorded.
 // --voice-off: as with "Your voice" off and the Soundboard open (the voice goes through unchanged).
 if let path = arg("--test-sounds") {
     let voiceOff = args.contains("--voice-off")
@@ -1040,7 +1039,7 @@ if let path = arg("--test-sounds") {
     }
     let micUID = arg("--mic").flatMap { name in Mics.list().first { $0.name == name }?.uid }
     let voice = VoiceShifter(halfSteps: steps, cartoon: 0, micUID: micUID)
-    guard let mic = voice.currentMic, let virtualMic = Mics.virtualMic else { print("No mic or Pitch Shift Mic not installed"); exit(1) }
+    guard let mic = voice.currentMic, let virtualMic = Mics.virtualMic else { print("No mic or Swoopy Mic not installed"); exit(1) }
     let rate = nominalRate(mic)
     let volume = arg("--volume").flatMap(Double.init) ?? 0.05
     var phase = 0.0
@@ -1124,7 +1123,7 @@ if let path = arg("--test-sounds") {
     dispatchMain()
 }
 
-// Pitch Shift Pro: pictures show the state asked for (unlocked unless pro-locked or the unlock window is asked for)
+// Swoopy Pro: pictures show the state asked for (unlocked unless pro-locked or the unlock window is asked for)
 // and touch no file; the app has read and checked its saved key at the top.
 if preview != nil {
     let locked = previewStates.contains("pro-locked") || (previewStates.contains("pro-unlock") && !previewStates.contains("pro-unlocked"))

@@ -1,6 +1,6 @@
 # GitHub checks only: installs VB-CABLE (a virtual audio cable) on a GitHub runner, so the tests have
 # a full sound path: whatever plays to "CABLE Input" comes out of "CABLE Output" where it is recorded.
-# (Real users get VB-CABLE through the Pitch Shift installer, which shows VB-Audio's own setup window.)
+# (Real users get VB-CABLE through the Swoopy installer, which shows VB-Audio's own setup window.)
 #
 # Tries VB-CABLE Driver Pack 45 first (Microsoft-signed, x64 + ARM64). Windows Server may refuse that
 # signature, so on failure it falls back to Mozilla cubeb's CI recipe: Pack 43 + trust VB-Audio's

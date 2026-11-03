@@ -1,5 +1,5 @@
-Pitch Shift Mic is BlackHole v0.7.1 by Existential Audio Inc. (https://github.com/ExistentialAudio/BlackHole),
+Swoopy Mic is BlackHole v0.7.1 by Existential Audio Inc. (https://github.com/ExistentialAudio/BlackHole),
 GPL-3.0 (see LICENSE in this folder). BlackHole.c is unchanged; driver/build.sh only sets build options:
-a visible input-only device "Pitch Shift Mic" and a hidden output-only twin "Pitch Shift Mic Output"
-that the Pitch Shift app writes your shifted voice into. Its own bundle ID, device IDs and factory ID
+a visible input-only device "Swoopy Mic" and a hidden output-only twin "Swoopy Mic Output"
+that the Swoopy app writes your shifted voice into. Its own bundle ID, device IDs and factory ID
 keep it separate from any BlackHole you already have.

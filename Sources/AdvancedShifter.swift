@@ -286,7 +286,7 @@ final class AdvancedWorker {
     func start() {
         audio_ring_skip(input.ring, Int32(input.count))  // old sound from before this player: drop it
         let thread = Thread { [self] in run() }
-        thread.name = "Pitch Shift advanced"
+        thread.name = "Swoopy advanced"
         thread.qualityOfService = .userInteractive
         thread.stackSize = 1 << 20
         self.thread = thread

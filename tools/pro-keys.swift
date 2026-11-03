@@ -1,4 +1,4 @@
-// Pitch Shift Pro keys, for the owner: the program behind tools/pro-keys.sh (see there for how to use it).
+// Swoopy Pro keys, for the owner: the program behind tools/pro-keys.sh (see there for how to use it).
 // Runs with the Swift that comes with the Mac's Command Line Tools; nothing else to install.
 //
 // Signed keys (since 2026-10-19): 115 characters from 23456789ABCDEFGHJKMNPQRSTUVWXYZ (no 0, 1, I, L or O), shown in

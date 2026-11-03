@@ -41,7 +41,7 @@ On voiced parts only (where the original has a clear pitch):
 
 ## How to verify
 - Listening samples in `~/Downloads/Pitch Shift voice samples/`.
-- After the fix: `--test-voice --file speech.aiff --steps 3 --out …` before/after through the real Pitch Shift Mic,
+- After the fix: `--test-voice --file speech.aiff --steps 3 --out …` before/after through the real Swoopy Mic,
   run the same buzz measures on those recordings; `--test-voice --tone 440 --steps 3` must still read ≈523.3 Hz
   (and a Cartoon tone); measure the delay (tone start → first sound); `--test-button` still works.
 - Keep: Natural/Cartoon switch while running, bypass at 0, live amount changes, no memory made on the sound
@@ -53,7 +53,7 @@ Owner's saved setting at the time: +15 half steps (later +10). Mic: G522 LIGHTSP
 
 ### Cause 1 (the buzz): Rubber Band's live shifter stops keeping formants at about 10 kHz
 - Our own code was not the problem: the copy of `render`/ring gave exactly the same samples as calling the live
-  shifter directly (callback sizes 512, 480, 1024, odd sizes), never clipped, and a live recording through Pitch Shift
+  shifter directly (callback sizes 512, 480, 1024, odd sizes), never clipped, and a live recording through Swoopy
   Mic matched the offline output sample for sample (match 0.9998) once cause 2 was fixed.
 - Harmonics, noise between harmonics and wobble were all fine (as good as Rubber Band's best offline mode).
 - But above ~10 kHz the live shifter does not correct formants in Natural: everything up there is moved up exactly like
@@ -69,7 +69,7 @@ Owner's saved setting at the time: +15 half steps (later +10). Mic: G522 LIGHTSP
   | +15 | −32 dB | −50 dB |
 
   Female voice (original −44.5 dB): +3 −30 → −43, +5 −27 → −43, +15 −27 → −48. Down shifts (−3) were fine
-  before and after (nothing above 10 kHz). Same numbers through the real Pitch Shift Mic recordings.
+  before and after (nothing above 10 kHz). Same numbers through the real Swoopy Mic recordings.
 - Rubber Band's R3 real-time stretcher with `PitchHighSpeed` has the same seam; `PitchHighConsistency` /
   `PitchHighQuality` don't. `WindowMedium` live shifter and formant scale tweaks don't help (same −32 dB at +15).
   R2 (`EngineFaster`) fixes the top band but is rougher (HNR 2–10 dB worse on vowels).
@@ -77,7 +77,7 @@ Owner's saved setting at the time: +15 half steps (later +10). Mic: G522 LIGHTSP
 ### Cause 2 (cut-outs): the voice chain restarted itself every few seconds
 - Creating or closing our private combined device fires the "device list changed" listener, which rebuilt the
   chain, which fired it again. Gaps of 130–150 ms every 0.7 s at first, then every ~3.5 s, and the shifter
-  started over each time. Fixed: rebuild only when the mic, Pitch Shift Mic, or a sample rate really changed.
+  started over each time. Fixed: rebuild only when the mic, Swoopy Mic, or a sample rate really changed.
 
 ### The fix
 - Voice now uses `rubberband_new(rate, 1, RealTime | EngineFiner | WindowShort | PitchHighConsistency |
@@ -95,19 +95,19 @@ Owner's saved setting at the time: +15 half steps (later +10). Mic: G522 LIGHTSP
 ### Delay (as of 2026-10-13; newer numbers under "Delay work" at the end)
 - Processing only (offline, 512-sample callbacks): before 58–83 ms, after 56–85 ms
   (+3: 59 → 66, −3: 60 → 76, +5: 62 → 60, +10: 73 → 62, +15: 83 → 60, −12: 74 → 85).
-- Mic to Pitch Shift Mic, measured live with `--test-voice --tone 440` (same measuring code on both):
+- Mic to Swoopy Mic, measured live with `--test-voice --tone 440` (same measuring code on both):
   +3: 87 → 92 ms, −3: 86 → 103 ms, +15: 99 → 79 ms.
 - R3 standard window would be +3: 94 ms, −3: 112 ms, −12: 144 ms processing alone (too slow for calls).
 
 ### Checks done
 - Tone pitch through the real chain (before the owner's call started): +3 Natural 523.5 Hz (expected 523.3),
-  +3 Cartoon 523.5, +15 1046.5 (1046.5), −12 220.0, +2.37 504.5 (504.6). Speech recordings through Pitch Shift Mic
+  +3 Cartoon 523.5, +15 1046.5 (1046.5), −12 220.0, +2.37 504.5 (504.6). Speech recordings through Swoopy Mic
   at +3/+15 (male/female): no gaps, top band fixed, other numbers same as offline.
 - Not run (owner was in a Discord call): `--test-button` and repeat device checks; see the report for commands.
 
 ### Listening samples
 `~/Downloads/Pitch Shift voice samples/` (male voice; 2/5 are the old sound, 3/6 the fix, 7 the slower option,
-9 a real recording from Pitch Shift Mic of the app as it was, with the cut-outs).
+9 a real recording from Swoopy Mic of the app as it was, with the cut-outs).
 
 ### Tools (scratchpad, not in the repo)
 `rbtest.swift` (offline shifter variants), `sim.swift` (the new chain logic), `cushion.swift`, `buzz.py` (measures),
@@ -117,7 +117,7 @@ Owner's saved setting at the time: +15 half steps (later +10). Mic: G522 LIGHTSP
 
 Owner: "The voice pitch filter causes a lot of delay." Measured with `--test-voice --mic "MacBook Pro Microphone"
 --tone 440 --watch --seconds 60`: a made-up tone replaces the mic sound at the start of the chain, plays half of every
-second, and the time from each tone start (the mic's own time stamp) to it arriving in Pitch Shift Mic is measured.
+second, and the time from each tone start (the mic's own time stamp) to it arriving in Swoopy Mic is measured.
 The mic's own hardware delay is not in these numbers (the MacBook mic reports 30 ms on top).
 
 ### Where the delay came from (+3, before)
@@ -126,7 +126,7 @@ The mic's own hardware delay is not in these numbers (the MacBook mic reports 30
 | callbacks of 512 samples: one on the way in, one on the way out (+ 1.5 ms safety) | ~22 | yes: 128 samples → ~6 |
 | Rubber Band itself (R3 short window: it needs ~53 ms of sound before it can hand back the middle of it) | ~50 | no, not without changing the sound |
 | sound waiting in the ring ("one callback + 20 ms cushion"; the lowest point sat at ~16 ms) | ~16 | yes: ~2 |
-| total, mic → Pitch Shift Mic | **88** | |
+| total, mic → Swoopy Mic | **88** | |
 | (not measured above) the MacBook mic's own delay | 30 | no |
 
 - It did **not** grow: 60 s at +3, −5 and +7, the delay stayed within ±2 ms, no dry-outs, no skips.
@@ -135,7 +135,7 @@ The mic's own hardware delay is not in these numbers (the MacBook mic reports 30
   at any sample rate (its window is a fixed length in time).
 - Handing Rubber Band pieces of up to 4096 samples did not add delay: the callbacks were 512 samples, so it got 512
   at a time anyway, and everything it had ready was taken out right away.
-- No sample-rate conversion in the chain: Pitch Shift Mic runs at the mic's rate; only the tiny clock correction.
+- No sample-rate conversion in the chain: Swoopy Mic runs at the mic's rate; only the tiny clock correction.
 - Rubber Band's "high quality" pitch option would cut 16 ms at −5 and 43 ms at −12 (up shifts unchanged), but it
   changes the Natural sound a lot (some bands differ by 15–29 dB, a hole around 6–10 kHz), so it was not used.
 - Bluetooth headsets in call mode add their own 150–300 ms (handled on `v2-bluetooth-mic`), and the call app
@@ -169,7 +169,7 @@ The mic's own hardware delay is not in these numbers (the MacBook mic reports 30
   Without the 12 ms top-up it ran dry up to 11 times a minute when the set amount was 0.
 - The ring adds no clicks: same peak and same largest sample-to-sample step as Rubber Band's own output.
 
-### Before / after (mic → Pitch Shift Mic, built-in mic, 48 kHz)
+### Before / after (mic → Swoopy Mic, built-in mic, 48 kHz)
 | amount | before: delay | before: Rubber Band + waiting | after: delay | after: Rubber Band + waiting |
 |---|---|---|---|---|
 | +3 Natural | 88 ms (87–89 over 60 s) | 66 ms | **57–58 ms** (live, 60 s) | 52 ms |
@@ -181,20 +181,20 @@ The mic's own hardware delay is not in these numbers (the MacBook mic reports 30
 - After (live, +3, 60 s): callbacks of 128, 0 dry-outs, 1 overload at start-up only, one trim at 2 s, no growth, pitch
   523.5 Hz (expected 523.3). The "model" numbers are Rubber Band + waiting from the offline model (the app's own
   VoiceRing.swift with the real Rubber Band) plus the ~6 ms of 128-sample callbacks measured live.
-- Not re-run live after the merge with 2.0.1 (the Pitch Shift app stayed open, so the new test guard refused for 15
-  minutes): −5, +7, Cartoon, middle style, the 220 Hz pitch check, speech through Pitch Shift Mic vs the offline
+- Not re-run live after the merge with 2.0.1 (the Swoopy app stayed open, so the new test guard refused for 15
+  minutes): −5, +7, Cartoon, middle style, the 220 Hz pitch check, speech through Swoopy Mic vs the offline
   render, and `--test-button`.
 
 ### Test safety (2026-10-14 call echo)
 - During earlier voice tests the owner, in a browser call (Firefox, MacBook mic, Sony headphones in call mode),
   heard their own voice echo. The system log showed the tests did not change any default device, sample rate or
-  another app's settings, Firefox never opened Pitch Shift Mic, and Firefox's mic stream ran unbroken through the
+  another app's settings, Firefox never opened Swoopy Mic, and Firefox's mic stream ran unbroken through the
   tests after the call had started. Another test's `--test-button` did play two 5 s test-tone recordings into the
   headphones during the call. Firefox restarted its echo canceller about 10 times in 8 s at the start of the call
   (switching between the headphones' mic and the MacBook mic): the most likely source, along with the far end.
 - Now the device tests (`--test`, `--test-voice`, `--test-button`, `--test-sounds`, `--test-default-mic`) refuse to
-  start while Pitch Shift Mic, the built-in mic or any Bluetooth mic is in use by another app, or while the Pitch
-  Shift app is open (with "Your voice" on it would wake on the real mic as soon as a test reads Pitch Shift Mic).
+  start while Swoopy Mic, the built-in mic or any Bluetooth mic is in use by another app, or while the Swoopy
+  app is open (with "Your voice" on it would wake on the real mic as soon as a test reads Swoopy Mic).
   `--list` marks devices in use.
 
 ## Second check: "it still sounds buzzy" (2026-10-14 evening, branch `v2-voice-buzz`)
@@ -324,12 +324,12 @@ Made-up voices, Natural, +5/+10/−4 (difference from the perfect shifted voice)
   - Windows: not changed (its voice engine is separate C++).
 
 ### Sample rates (answer to the owner's question)
-- Pitch Shift Mic (BlackHole) supports 8, 16, 24, 44.1, 48, 88.2, 96, 176.4, 192, 352.8, 384, 705.6 and 768 kHz
+- Swoopy Mic (BlackHole) supports 8, 16, 24, 44.1, 48, 88.2, 96, 176.4, 192, 352.8, 384, 705.6 and 768 kHz
   (`kSampleRates` in driver/BlackHole.c). **BlackHole does not limit anything.** Both of its sides share one rate.
-- The voice chain runs at the **mic's** rate (`VoiceChain.init`: rate = `nominalRate(mic)`; Pitch Shift Mic is set to
+- The voice chain runs at the **mic's** rate (`VoiceChain.init`: rate = `nominalRate(mic)`; Swoopy Mic is set to
   match; the app never changes the real mic). `--list` on this Mac: MacBook Pro Microphone 48 kHz (supports 44.1, 48,
   88.2, 96), Headphonez V3 (Bluetooth) mic 16 kHz only, G522 48 kHz only, iPhone mic 48 kHz only. So with the built-in
-  mic everything is 48 kHz end to end; with a Bluetooth headset mic, Pitch Shift Mic itself drops to 16 kHz.
+  mic everything is 48 kHz end to end; with a Bluetooth headset mic, Swoopy Mic itself drops to 16 kHz.
 - Rubber Band scales its window with the rate (2048 samples at 48 kHz, 4096 at 96 kHz: both 43 ms), so at 96 kHz it
   "sees" the voice the same way; only its frames come twice as often (the hop stays 512 samples). Measured: no better
   (table above), +3 ms delay on average (+8 ms at +5), 3× the CPU. A voice has nothing above 20 kHz and Discord/Zoom
@@ -345,7 +345,7 @@ Made-up voices, Natural, +5/+10/−4 (difference from the perfect shifted voice)
   This only matters when comparing `--render-voice` output with its input.
 
 ### Not tested
-- A device test (`--test-voice --mic "MacBook Pro Microphone"`): the MacBook mic and Pitch Shift Mic were in use the
+- A device test (`--test-voice --mic "MacBook Pro Microphone"`): the MacBook mic and Swoopy Mic were in use the
   whole time (the owner was in a call), checked every 30 s for 10 min; after the fix the G522 headset mic was in use
   for another 10 min. So the live chain with the fix (softLimit included), the drift correction on the hidden feed (its
   quality is left at Core Audio's default) and real-time overloads under heavy load (this Mac had 9 GB of swap in use)
@@ -357,7 +357,7 @@ Made-up voices, Natural, +5/+10/−4 (difference from the perfect shifted voice)
 1. Use the MacBook mic (or a USB/wired mic), not a Bluetooth headset mic.
 2. In Discord (Voice & Video) / Zoom: turn noise suppression off (or "None"), and try echo cancellation and automatic
    gain off.
-3. Press Test in Pitch Shift: if the replay sounds clean but the call sounds buzzy, it is the call app's filters.
+3. Press Test in Swoopy: if the replay sounds clean but the call sounds buzzy, it is the call app's filters.
 4. Smaller amounts sound cleaner (the "tone" effect grows with the amount); the style slider changes it little.
 5. Keep the mic's input level moderate (System Settings → Sound → Input): loud words at big Natural amounts were the
    ones that got cut off before the fix.
@@ -435,7 +435,7 @@ Natural, held-out VCTK and `say` sets, after 8 s of the same speaker (r3 = the v
   shape move doesn't change the `say` number (71 % at 1.6, 69 % at 1.8); shorter pieces (`pulseWindow` 0.6) do
   (73 %, VCTK 100 %) but lower quality (VCTK 3.42), so they're not used. Real voices' buzz numbers are 63-100; the
   women -> Man pulses come out a bit crisper than real men on VCTK (99 vs 84).
-- Delay, mic to Pitch Shift Mic minus the devices (128-sample callbacks, sound lined up): Natural Woman 51 -> 45 ms,
+- Delay, mic to Swoopy Mic minus the devices (128-sample callbacks, sound lined up): Natural Woman 51 -> 45 ms,
   Man 80 -> 45 ms; plain +3 52 ms (unchanged), +10 50 -> 45, -8 73 -> 45, -12 84 -> 44. The app's offline live
   chain (`--live-sim`, 60 s): 0 dry-outs in every case. Switching shifters (changer on/off, amount crossing 6)
   starts fresh: 60-75 ms quiet, like leaving 0.

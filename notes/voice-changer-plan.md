@@ -1,7 +1,7 @@
 # Plan: "Voice changer" — a third card that turns a man's voice into a woman's and a woman's into a man's
 
 ## Context
-The owner wants one more widget in Pitch Shift: a **Voice changer** with two voices first — **Woman** (for a man's voice) and **Man** (for a woman's voice) — that sound **real**, work **live** in calls, keep the **48 kHz** path, cost **nothing** to anyone (no paid services, no cloud), may use **AI** if it is local, free and convincing, and are **expandable** so more voices can be added later. Built by a workflow of **at most 5 Opus agents** (research → plan → implement).
+The owner wants one more widget in Swoopy: a **Voice changer** with two voices first — **Woman** (for a man's voice) and **Man** (for a woman's voice) — that sound **real**, work **live** in calls, keep the **48 kHz** path, cost **nothing** to anyone (no paid services, no cloud), may use **AI** if it is local, free and convincing, and are **expandable** so more voices can be added later. Built by a workflow of **at most 5 Opus agents** (research → plan → implement).
 
 Decisions the owner made (2026-10-14/15): a **third card in the main window**; **AI "Realistic" mode on Apple silicon, non-AI mode as the Intel fallback and the default**; the **user chooses the delay/quality trade-off** ("let the user choose, do all"); part of the **free app** (committed locally, then pushed as a PR like the other features); AI voices **bundled in the installer** (a big installer is fine).
 
@@ -30,7 +30,7 @@ What exploration found (two read-only agents, Oct 2026):
 - Changed: `VoiceShifter.swift` (VoiceParams, VoiceStretcher, VoiceChain, VoiceShifter, renderVoiceFile), `Window.swift`, `main.swift`, `Bridging.h`, `build.sh` (per-arch loop: compile `Sources/Voice/*.cpp` and `*.mm -fobjc-arc`, link `-framework CoreML`, copy the voices), README credits.
 
 ### Natural mode (DSP, every Mac, default)
-Order in `render()`: mic → `voicechanger_analyse` (pitch tracker, pitch mapping, creak) sets Rubber Band's pitch + formant scale → Rubber Band R3 (forced on) → ring → `voicechanger_post` (sibilance → tone EQ → presence → breath) → silent/Soundboard mix/clamp → Pitch Shift Mic. Analysis runs alongside the sound and post uses only IIR filters: **adds no delay** (acceptance: = plain voice ± 2 ms). All buffers made in `voicechanger_new`; analyse/post allocate nothing and take no locks.
+Order in `render()`: mic → `voicechanger_analyse` (pitch tracker, pitch mapping, creak) sets Rubber Band's pitch + formant scale → Rubber Band R3 (forced on) → ring → `voicechanger_post` (sibilance → tone EQ → presence → breath) → silent/Soundboard mix/clamp → Swoopy Mic. Analysis runs alongside the sound and post uses only IIR filters: **adds no delay** (acceptance: = plain voice ± 2 ms). All buffers made in `voicechanger_new`; analyse/post allocate nothing and take no locks.
 - **C API (fixed at Step 0):** `VoiceChangerVoice {targetHz, assumedInputHz, intonation, formant, breathDb, presenceDb, sibilanceKeep, eqAmount, ltas[21]}`; `VoiceChangerPitch {pitchScale, formantScale, voiced, f0In, f0Target, newFrames, frameHz[64], framePos[64]}`; `voicechanger_new/delete/set(voice|NULL, strength)/reset/analyse(in, frames, extraSemitones, out)/post(io, frames, delayFrames)/tune(key, value)/get_stats`.
 - **Pitch tracker:** YIN on a ÷3 downsampled copy (÷6 at 96 kHz, none at 16 kHz), 32 ms window, 10 ms hop, 55–600 Hz, threshold 0.12, parabolic interpolation, octave-jump rejection against the running median, median of 3; ~0.1 ms per hop on the sound thread. Voiced = aperiodicity < 0.25 and level > floor + 10 dB and > −50 dBFS.
 - **Pitch mapping (target median, like Praat):** median from a 4 s histogram of voiced frames (¼-semitone bins, seeded by `assumedInputHz`); `off = 12·log2(targetHz/median)`; `dev = clamp(st(f0) − st(median), ±12)`; `P_st = s·(off + (intonation − 1)·dev) + extraSemitones`, limited to ±15; smoothed 25 ms, held through unvoiced frames.
@@ -174,7 +174,7 @@ on "judged man" and on the voice print and +1.2 points on word errors, which was
 | 7. Windows untouched | no change under `windows/`, `Sources/Advanced/`, `.github/` |
 | 8. No leak of the real voice | forced late pieces: Natural filled in with 0 frames at the speaker's own pitch (A2's real-time test program) |
 | Build | clean, the same compiler warnings as main |
-| Live device tests | **not run yet**: the guard refused every time because the Pitch Shift app was open (the scripts are ready, see below) |
+| Live device tests | **not run yet**: the guard refused every time because the Swoopy app was open (the scripts are ready, see below) |
 
 ### Fixes after the first listen (2026-10-15 evening)
 
@@ -243,7 +243,7 @@ voice on; settings saved with both on: the changer wins. In Realistic mode the L
 hidden: hiding it would change the card's height and the window's layouts). Command line: `--steps` and
 `--slow-deeper` are ignored with `--voice` (a note is printed). `--test-button --voice Woman [--quality realistic]
 [--file F]` records and plays back the changed voice (not run: it plays sound out loud; the live tests were refused
-for 15 minutes because the Pitch Shift app was open).
+for 15 minutes because the Swoopy app was open).
 
 ### Shortfalls, in plain words
 - **Natural** fools the man/woman classifier, but a voice print still hears the same person: "a man with a
@@ -254,7 +254,7 @@ for 15 minutes because the Pitch Shift app was open).
 - **Realistic Woman** slurs some words (10 % word errors vs 3.4 % for the original voices). The cause is converting
   live without hearing ahead; only more delay would fix it (1 s of past sound was the best setting measured).
 - **A game using the GPU** can make Realistic fall behind; Natural then fills in and the card shows it.
-- **Nobody has listened yet**, and the live microphone tests still have to run with the Pitch Shift app quit.
+- **Nobody has listened yet**, and the live microphone tests still have to run with the Swoopy app quit.
 
 ### Tools (git-ignored, in `research/voicechanger/`)
 `a1/harness/` (render, measure, pass-mark tables), `a4/` (`tune.sh`, `check1.sh`, `blind.py`, `devtests.sh`,
@@ -326,7 +326,7 @@ after ~8 s of the same speaker so the pitch median is settled; tools in `researc
 7.9 %, C 7.2 % words there; the app itself measured 9.4 % today on the same 70 clips.)
 
 **The slider, position by position** (stream delay measured in real time with the app's own code: the output lined
-up within 6 ms of it at 0 / 150 / 400 / 700 ms; the card adds one callback and what the mic and Pitch Shift Mic report,
+up within 6 ms of it at 0 / 150 / 400 / 700 ms; the card adds one callback and what the mic and Swoopy Mic report,
 about 20 ms on a MacBook):
 
 | slider | look-ahead | stream delay | card shows | word errors (70 / 30) | quality |
@@ -369,7 +369,7 @@ card is 33 pt taller (smallest windows 588×581 and 306×850; side by side 870×
 **Left / not sure (3.1):** nobody has listened yet; the jitter goal was met on synthetic held notes, not a real singer;
 Whisper hears the "a" of "a judicial review" as "its" in most versions (also today's), a breathy start the AI voice
 adds; slider moves in a room that is never quiet switch after 3 s with a crossfade (heard as a small jump); the delay
-on the card uses what Core Audio reports for the mic and Pitch Shift Mic (a live measurement is still to do).
+on the card uses what Core Audio reports for the mic and Swoopy Mic (a live measurement is still to do).
 
 ## 3.1.1: the AI voice starts right away again, and held notes stay put (2026-10-16)
 
@@ -519,7 +519,7 @@ open; 3.1.1 = a build of `git archive` of main f7757c3; tools in `research/voice
   ms on average instead of 49, worst 75-160 ms), which is about the "busy Mac" case. A busy GPU was simulated by making
   every piece 60 ms slower while the generator is on its own chip (`aiSlowMs=60,aiSlowChip=1`, generator on CPU +
   Neural Engine so no GPU was used); the real GPU-load test (`gpuload.swift`) and the 8-busy-threads test were not
-  run: the owner's Pitch Shift was recording from the G522 headset mic every time it was checked.
+  run: the owner's Swoopy was recording from the G522 headset mic every time it was checked.
 
 **Look-ahead at the most-real end, picked first** (3.2 changes off, 75 clips; "within noise of 700": words ≤ +0.6
 points, MOS ≥ -0.02, poor joins ≤ +0.5 points):
@@ -587,7 +587,7 @@ Not changed (the owner's choice).
 1, Man 0.25, CPU); Natural 15/15 identical (with and without the key, half strength, `--live-sim`); changer off 14/14
 identical; 36 compiler warnings (as main); the Intel half says "Realistic mode: needs Apple silicon". Not run: live
 microphone tests, the real GPU-load test, the 8-busy-threads test and the GPU-vs-CPU start comparison (the owner's
-Pitch Shift was recording from their headset mic each time it was checked); hidden previews (no window code changed).
+Swoopy was recording from their headset mic each time it was checked); hidden previews (no window code changed).
 
 **Left / not sure:** nobody has listened (`~/Downloads/Pitch Shift 3.2 compare/`); the pass marks missed above
 (poor joins 3.0 / 4.3 % vs 2 / 3 %, pitch jumps 15 vs 13, tone over consonants 4.7 vs 3.0, hum at -25 dBFS 11-16 %,
