@@ -25,7 +25,7 @@ final class Capture {
         // A private, hidden sound device that only holds the tap. Leaving the real speakers out of it keeps
         // headphone mics switched off (a Bluetooth mic turning on would drop the headphones into low-quality call mode).
         let settings: [String: Any] = [
-            kAudioAggregateDeviceNameKey: "Pitch Shift",
+            kAudioAggregateDeviceNameKey: "Swoopy",
             kAudioAggregateDeviceUIDKey: UUID().uuidString,
             kAudioAggregateDeviceIsPrivateKey: true,
             kAudioAggregateDeviceTapAutoStartKey: true,

@@ -1,4 +1,4 @@
-# Pitch Shift Pro: the unlock server
+# Swoopy Pro: the unlock server
 
 **Not used yet.** Since 2026-10-16 the app doesn't talk to any server: people email the owner for a key, the owner
 makes it with `tools/pro-keys.sh` and emails it back, and the app checks it on its own (see
@@ -6,7 +6,7 @@ makes it with `tools/pro-keys.sh` and emails it back, and the app checks it on i
 later version that sells keys through Stripe. Its keys and the app's are made differently, and the app no longer has
 the `/activate` and `/check` calls, so both would need changing before it's used.
 
-A small Cloudflare Worker that sells and checks Pitch Shift Pro keys ($5, once, all your Macs). It runs on
+A small Cloudflare Worker that sells and checks Swoopy Pro keys ($5, once, all your Macs). It runs on
 Cloudflare's free plan. The plan behind it: [../notes/paid-unlock-plan.md](../notes/paid-unlock-plan.md).
 
 | Address | What it does |
@@ -39,7 +39,7 @@ folder (`cd …/Pitch_Shifter/server`).
 4. `npm run make-keys` stores `SIGNING_KEY` and `KEY_SECRET` on Cloudflare and prints the **public key**. Put the
    address from step 3 and the public key in `../Sources/ProConfig.swift` (`server` and `publicKey`).
 5. Stripe, in **test mode** first (the "Test mode" switch at the top of the dashboard):
-   - **Product catalog → Add product**: name "Pitch Shift Pro", price **5.00 USD**, **One-off**. Save.
+   - **Product catalog → Add product**: name "Swoopy Pro", price **5.00 USD**, **One-off**. Save.
    - On the product, **Create payment link**. Under **After payment**, choose **Don't show confirmation page** and
      enter `https://pitch-shift-pro.YOURNAME.workers.dev/thanks?session_id={CHECKOUT_SESSION_ID}` (exactly like
      that, with the curly brackets). Create the link and copy it (`https://buy.stripe.com/…`) into
@@ -51,13 +51,13 @@ folder (`cd …/Pitch_Shifter/server`).
      Endpoint URL `https://pitch-shift-pro.YOURNAME.workers.dev/stripe-webhook`. On the page that opens, click
      **Reveal secret** (`whsec_…`), run `npx wrangler secret put STRIPE_WEBHOOK_SECRET` and paste it.
    - **API keys → Create restricted key** (dashboard.stripe.com/apikeys): start from zero permissions, name
-     "Pitch Shift Pro server", set **Checkout Sessions** to **Read** and leave everything else on None, **Create key**.
+     "Swoopy Pro server", set **Checkout Sessions** to **Read** and leave everything else on None, **Create key**.
      Copy it (`rk_test_…`), run `npx wrangler secret put STRIPE_SECRET_KEY` and paste it.
 6. Email (optional, recommended): make a free account at resend.com, **Domains → Add domain** (a domain you own, for
    example bought on Cloudflare for about $10 a year) and add the DNS records it shows (on Cloudflare: one click,
    "Sign in to Cloudflare" / auto-configure). Then **API Keys → Create API key** (sending access), run
    `npx wrangler secret put RESEND_API_KEY` and paste it. In `wrangler.toml` set
-   `EMAIL_FROM = "Pitch Shift <keys@YOURDOMAIN>"`, then `npm run deploy` again.
+   `EMAIL_FROM = "Swoopy <keys@YOURDOMAIN>"`, then `npm run deploy` again.
 7. Test: open the payment link, pay with card `4242 4242 4242 4242`, any future date, any 3 digits. The thank-you page
    shows a key; the email arrives (if set up). Build the app, click **Unlock Pro**, paste the key: unlocked.
 8. Go live: in Stripe, switch test mode off and repeat step 5 in live mode (new product, link, webhook, restricted

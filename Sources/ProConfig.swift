@@ -1,4 +1,4 @@
-// Pitch Shift Pro: where to ask for a key, the price, and what keys are checked with.
+// Swoopy Pro: where to ask for a key, the price, and what keys are checked with.
 // The check data is never in git: build.sh puts it in at build time (tools/pro-config.sh), from PRO_PUBLIC_KEY or
 // ~/Library/Application Support/Pitch Shift Keys/signing-public.txt (made by tools/pro-keys.sh setup on the owner's
 // Mac), and from issued.txt in the same folder (or PRO_ISSUED) for the older keys.

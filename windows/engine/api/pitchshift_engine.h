@@ -1,4 +1,4 @@
-/* Pitch Shift sound engine: the small C interface the window app (C#) calls.
+/* Swoopy sound engine: the small C interface the window app (C#) calls.
    All text is UTF-8. Functions that return text return a pointer that stays valid until the
    next call of the same function on the same thread. Functions that return int give 0 for
    "worked" and a negative number for "didn't work". */
@@ -24,7 +24,7 @@ PS_API const char* ps_version(void);
 PS_API int ps_init(void);
 /* Stops everything and puts every app volume back. */
 PS_API void ps_shutdown(void);
-/* Puts back every app volume Pitch Shift lowered. Returns how many were fixed. */
+/* Puts back every app volume Swoopy lowered. Returns how many were fixed. */
 PS_API int ps_restore_all(void);
 
 /* JSON list of apps playing sound: [{"exe":..,"name":..,"pid":..,"playing":true}, ...] */
@@ -38,7 +38,7 @@ PS_API const char* ps_status_json(void);
 
 /* What you hear. mode 0 = process `pid` and everything it started, mode 1 = all sound. */
 PS_API int ps_music_start(int mode, int pid);
-/* What you hear: all sound (everything except Pitch Shift). */
+/* What you hear: all sound (everything except Swoopy). */
 PS_API int ps_music_start_all(void);
 /* What you hear: the ticked apps, as a JSON list of program files ["C:\\...\\Spotify.exe", ...].
    Apps that aren't open join as soon as they start (and again after they restart). */
@@ -51,7 +51,7 @@ PS_API int ps_music_set_semitones(double half_steps);
 PS_API int ps_music_set_advanced(int on);
 
 /* Your voice. endpoint_id = a microphone id from ps_list_mics_json, or "" for the default.
-   While it's on, Pitch Shift Mic is the Windows default microphone (given back when it's off). */
+   While it's on, Swoopy Mic is the Windows default microphone (given back when it's off). */
 PS_API int ps_voice_start(const char* endpoint_id);
 PS_API int ps_voice_stop(void);
 PS_API int ps_voice_set_semitones(double half_steps);

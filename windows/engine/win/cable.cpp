@@ -233,7 +233,7 @@ int setup_mic(const SetupOptions& o, nlohmann::json& log) {
             for (ERole role : {eConsole, eMultimedia, eCommunications})
                 saved.push_back({flow, role, default_endpoint_id(flow, role)});
 
-        const fs::path work = o.work_dir.empty() ? fs::temp_directory_path() / L"PitchShiftSetup" : fs::path(o.work_dir);
+        const fs::path work = o.work_dir.empty() ? fs::temp_directory_path() / L"SwoopySetup" : fs::path(o.work_dir);
         std::error_code ec;
         fs::create_directories(work, ec);
         std::wstring zip = o.pack_zip;
@@ -295,7 +295,7 @@ int setup_mic(const SetupOptions& o, nlohmann::json& log) {
     reg_set(L"RestartNeeded", DWORD(0));
     reg_set(L"FeedEndpointId", cable.feed_id);
     reg_set(L"MicEndpointId", cable.mic_id);
-    // Only rename VB-CABLE if Pitch Shift installed it (someone else's setup stays as it is).
+    // Only rename VB-CABLE if Swoopy installed it (someone else's setup stays as it is).
     if (reg_dword(L"InstalledByPitchShift") != 0) {
         const HRESULT feed = rename_endpoint(cable.feed_id, kFeedName);
         const HRESULT mic = rename_endpoint(cable.mic_id, kMicName);

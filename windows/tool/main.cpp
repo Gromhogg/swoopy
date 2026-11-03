@@ -1,12 +1,12 @@
-// PitchShiftTool.exe <command> [options]
+// SwoopyTool.exe <command> [options]
 //
 // Everyday (the installer and the app use these):
-//   setup-mic [--silent] [--pack file.zip]   install VB-CABLE if needed and name it "Pitch Shift Mic" (admin)
+//   setup-mic [--silent] [--pack file.zip]   install VB-CABLE if needed and name it "Swoopy Mic" (admin)
 //                                            exit code: 0 ready, 3010 restart needed, 1223 not installed
-//   restore [--file path]                    put back app volumes that Pitch Shift lowered
+//   restore [--file path]                    put back app volumes that Swoopy lowered
 //   restore-names                            give VB-CABLE its own names back (admin)
 //   remove-cable                             remove VB-CABLE (admin)
-//   watch <pid> [--file path]                wait for Pitch Shift to end, then put volumes back
+//   watch <pid> [--file path]                wait for Swoopy to end, then put volumes back
 // Information:
 //   diag                                     sound devices, app sessions, restore list (JSON)
 // Checks (used on GitHub):
@@ -146,7 +146,7 @@ int wmain(int argc, wchar_t** argv) {
         say(std::string("Error: ") + e.what());
         return 2;
     }
-    say("Usage: PitchShiftTool <setup-mic|restore|restore-names|remove-cable|watch|diag|tonegen|record|probe|"
+    say("Usage: SwoopyTool <setup-mic|restore|restore-names|remove-cable|watch|diag|tonegen|record|probe|"
         "e2e-music|e2e-advanced|e2e-voice|e2e-crash|make-song|render-file|set-default|selftest> [options]");
     return command.empty() ? 0 : 1;
 }

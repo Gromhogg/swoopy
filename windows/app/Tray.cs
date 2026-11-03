@@ -16,7 +16,7 @@ sealed class Tray : IDisposable
         menu.Items.Add("Quit", null, (_, _) => quit());
         icon = new Forms.NotifyIcon
         {
-            Text = "Pitch Shift",
+            Text = "Swoopy",
             Icon = LoadIcon(),
             ContextMenuStrip = menu,
             Visible = true,
@@ -46,7 +46,7 @@ sealed class Tray : IDisposable
 
     // Shown once, the first time the window is closed.
     public void ShowTip() =>
-        icon.ShowBalloonTip(6000, "Pitch Shift is still on", "To stop it, right-click this icon and pick Quit.", Forms.ToolTipIcon.None);
+        icon.ShowBalloonTip(6000, "Swoopy is still on", "To stop it, right-click this icon and pick Quit.", Forms.ToolTipIcon.None);
 
     public void Dispose()
     {

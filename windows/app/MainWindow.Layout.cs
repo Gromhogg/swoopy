@@ -206,7 +206,7 @@ public partial class MainWindow
         card.BeginAnimation(OpacityProperty, new DoubleAnimation(0, 1, time) { EasingFunction = Motion.EaseOut });
     }
 
-    // Called when the footer changes between "● Pitch Shift Mic" and a button: the cards may need more room.
+    // Called when the footer changes between "● Swoopy Mic" and a button: the cards may need more room.
     void RowsChanged()
     {
         MeasureCards();

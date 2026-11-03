@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <!-- Tests for the window's logic that doesn't need a screen: the big number, settings,
-       what the pickers show. Runs anywhere: dotnet test windows/app.tests/PitchShift.Tests.csproj -->
+       what the pickers show. Runs anywhere: dotnet test windows/app.tests/Swoopy.Tests.csproj -->
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>

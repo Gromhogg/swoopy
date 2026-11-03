@@ -3,11 +3,11 @@ using System.Text.Json;
 
 namespace PitchShift;
 
-// Calls into the sound engine (PitchShiftEngine.dll, written in C++). See engine/api/pitchshift_engine.h.
+// Calls into the sound engine (SwoopyEngine.dll, written in C++). See engine/api/pitchshift_engine.h.
 // If the engine can't be loaded, the window still works; it just makes no sound.
 static class Engine
 {
-    const string Dll = "PitchShiftEngine.dll";
+    const string Dll = "SwoopyEngine.dll";
 
     [DllImport(Dll, CallingConvention = CallingConvention.Cdecl)] static extern IntPtr ps_version();
     [DllImport(Dll, CallingConvention = CallingConvention.Cdecl)] static extern int ps_init();

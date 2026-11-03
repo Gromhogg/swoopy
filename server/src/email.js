@@ -6,21 +6,21 @@ export function emailReady(env) {
 
 export function keyEmail(env, key) {
   const help = env.SUPPORT_EMAIL ? `\n\nQuestions? Write to ${env.SUPPORT_EMAIL}.` : "";
-  const text = `Thank you for buying Pitch Shift Pro!
+  const text = `Thank you for buying Swoopy Pro!
 
 Your key:
 
 ${key}
 
-In Pitch Shift, click Unlock Pro, paste the key and click Unlock. It works on all your Macs, for good.${help}`;
+In Swoopy, click Unlock Pro, paste the key and click Unlock. It works on all your Macs, for good.${help}`;
   const html = `<div style="font-family:-apple-system,Helvetica,Arial,sans-serif;font-size:15px;color:#222;line-height:1.5">
-<p>Thank you for buying Pitch Shift Pro!</p>
+<p>Thank you for buying Swoopy Pro!</p>
 <p>Your key:</p>
 <p style="font-family:Menlo,Consolas,monospace;font-size:20px;font-weight:bold;letter-spacing:1px;padding:12px 16px;border-radius:10px;background:#f3effd;display:inline-block">${key}</p>
-<p>In Pitch Shift, click <b>Unlock Pro</b>, paste the key and click <b>Unlock</b>. It works on all your Macs, for good.</p>
+<p>In Swoopy, click <b>Unlock Pro</b>, paste the key and click <b>Unlock</b>. It works on all your Macs, for good.</p>
 ${env.SUPPORT_EMAIL ? `<p style="color:#666">Questions? Write to ${escapeHtml(env.SUPPORT_EMAIL)}.</p>` : ""}
 </div>`;
-  return { subject: "Your Pitch Shift Pro key", text, html };
+  return { subject: "Your Swoopy Pro key", text, html };
 }
 
 export function escapeHtml(text) {

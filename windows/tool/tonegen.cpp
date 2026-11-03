@@ -2,7 +2,7 @@
 //   --pulse        tone for 0.3 s, then quiet for 0.7 s, over and over (for timing checks)
 //   --spawn-child  stay silent and start a second tonegen that plays (like a browser's sound helper)
 //   --log FILE     write a line "<time in ms> <count>" each time its own sound ran empty (a short gap the checks
-//                  would hear that has nothing to do with Pitch Shift)
+//                  would hear that has nothing to do with Swoopy)
 #include "tool/tool.h"
 
 #include "win/devices.h"

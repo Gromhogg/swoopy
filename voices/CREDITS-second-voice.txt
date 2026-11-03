@@ -1,4 +1,4 @@
-Recordings used to train Pitch Shift's second voices (3.5) and the sound sorter's extra layer.
+Recordings used to train Swoopy's second voices (3.5) and the sound sorter's extra layer.
 CC BY: Creative Commons Attribution (https://creativecommons.org/licenses/by/4.0/ and the 3.0 version); CC0: no
 rights reserved. FSD50K: Fonseca, Favory, Pons, Font, Serra, "FSD50K: an open dataset of human-labeled sound events"
 (2020), clips from Freesound. VocalSet: Wilkins, Seetharaman, Wahl, Pardo, "VocalSet: A Singing Voice Dataset"

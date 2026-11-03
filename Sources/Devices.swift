@@ -7,7 +7,7 @@ let system = AudioObjectID(kAudioObjectSystemObject)
 struct Problem: Error { let message: String }
 
 // All "What you hear" sound handling after the grab happens on this one queue.
-let audioQueue = DispatchQueue(label: "pitch-shift")
+let audioQueue = DispatchQueue(label: "swoopy")
 
 func address(_ selector: AudioObjectPropertySelector, _ scope: AudioObjectPropertyScope = kAudioObjectPropertyScopeGlobal) -> AudioObjectPropertyAddress {
     AudioObjectPropertyAddress(mSelector: selector, mScope: scope, mElement: kAudioObjectPropertyElementMain)
@@ -70,7 +70,7 @@ func setDefaultOutput(_ id: AudioDeviceID) {
     AudioObjectSetPropertyData(system, &addr, 0, nil, UInt32(MemoryLayout<AudioDeviceID>.size), &id)
 }
 
-// Finds a device by its UID, including hidden ones (like the hidden side of Pitch Shift Mic).
+// Finds a device by its UID, including hidden ones (like the hidden side of Swoopy Mic).
 func device(uid: String) -> AudioDeviceID? {
     var addr = address(kAudioHardwarePropertyTranslateUIDToDevice)
     var uid = uid as CFString

@@ -1,4 +1,4 @@
-# Pitch Shift for Windows (beta): the window app, the installer and the one-line installer.
+# Swoopy for Windows (beta): the window app, the installer and the one-line installer.
 # There's no Windows PC to test on, so these checks click through the window and install/uninstall
 # on GitHub's Windows computers (x64 and ARM64). Pictures of the window are uploaded as "artifacts".
 # (The sound engine's own checks are in windows.yml.)
@@ -56,25 +56,25 @@ jobs:
       - name: Build the sound engine and tool
         run: |
           cmake -S windows -B build -A ${{ matrix.cmake_arch }}
-          cmake --build build --config Release --parallel --target PitchShiftEngine PitchShiftTool
+          cmake --build build --config Release --parallel --target SwoopyEngine SwoopyTool
 
       - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: 10.0.x
 
       - name: Window logic tests (number, settings, pickers)
-        run: dotnet test windows/app.tests/PitchShift.Tests.csproj -c Release --logger "console;verbosity=normal"
+        run: dotnet test windows/app.tests/Swoopy.Tests.csproj -c Release --logger "console;verbosity=normal"
 
       - name: Build the window app
         run: |
-          dotnet publish windows/app/PitchShift.csproj -c Release -r ${{ matrix.rid }} `
+          dotnet publish windows/app/Swoopy.csproj -c Release -r ${{ matrix.rid }} `
             -p:EngineDir="${{ github.workspace }}\build\out\Release" `
             -p:InformationalVersion=$env:PS_VERSION -p:FileVersion=$env:PS_NUMERIC_VERSION -o dist
-          Copy-Item build/out/Release/PitchShiftTool.exe dist/
+          Copy-Item build/out/Release/SwoopyTool.exe dist/
           Get-ChildItem dist | Format-Table Name, Length
 
       - name: Window pictures (light and dark, many states)
-        run: ./windows/app.tests/ci/take-previews.ps1 -Exe dist/PitchShift.exe -Out shots
+        run: ./windows/app.tests/ci/take-previews.ps1 -Exe dist/Swoopy.exe -Out shots
 
       - uses: actions/upload-artifact@v7
         with:
@@ -123,18 +123,18 @@ jobs:
           uismoke/UiSmoke.exe dismiss-privacy --out ui-out/00-desktop-ready.png
 
       - name: Get sound ready (VB-CABLE, microphone access)
-        run: ./windows/ci/prepare-audio.ps1 -Tool dist/PitchShiftTool.exe
+        run: ./windows/ci/prepare-audio.ps1 -Tool dist/SwoopyTool.exe
 
       - name: Play a quiet tone from another app (something to pick in "What you hear")
         run: |
           $tone = Join-Path $env:RUNNER_TEMP 'tone'
           New-Item -ItemType Directory -Force $tone | Out-Null
-          Copy-Item dist/PitchShiftTool.exe $tone
-          Start-Process -FilePath (Join-Path $tone 'PitchShiftTool.exe') -ArgumentList 'tonegen', '--amp', '0.05', '--seconds', '1200' -WindowStyle Hidden
+          Copy-Item dist/SwoopyTool.exe $tone
+          Start-Process -FilePath (Join-Path $tone 'SwoopyTool.exe') -ArgumentList 'tonegen', '--amp', '0.05', '--seconds', '1200' -WindowStyle Hidden
           Start-Sleep -Seconds 3
 
       - name: Click through the window
-        run: uismoke/UiSmoke.exe run --app dist/PitchShift.exe --tool dist/PitchShiftTool.exe --out ui-out --source 'Pitch Shift helper'
+        run: uismoke/UiSmoke.exe run --app dist/Swoopy.exe --tool dist/SwoopyTool.exe --out ui-out --source 'Swoopy helper'
 
       - name: Screen at the end
         if: always()
@@ -143,7 +143,7 @@ jobs:
           uismoke/UiSmoke.exe desktop --out ui-out/99-desktop-end.png
           $log = Join-Path $env:LOCALAPPDATA 'Pitch Shift\app-log.txt'
           if (Test-Path $log) { Copy-Item $log ui-out/ }
-          dist/PitchShiftTool.exe diag | Out-File ui-out/diag-end.json
+          dist/SwoopyTool.exe diag | Out-File ui-out/diag-end.json
 
       - uses: actions/upload-artifact@v7
         if: always()
@@ -172,7 +172,7 @@ jobs:
           name: app-arm64
           path: dist-arm64
 
-      - name: Build PitchShift-Setup.exe (Inno Setup)
+      - name: Build Swoopy-Setup.exe (Inno Setup)
         run: ./windows/installer/ci/build-installer.ps1 -DistX64 dist-x64 -DistArm64 dist-arm64 -Version $env:PS_VERSION -NumericVersion $env:PS_NUMERIC_VERSION -Out installer-out
 
       - uses: actions/upload-artifact@v7
@@ -181,7 +181,7 @@ jobs:
           path: installer-out/
 
   installer-test:
-    name: install test (${{ matrix.arch }})
+    name: install test (${{ matrix.label }})
     needs: installer
     runs-on: ${{ matrix.runner }}
     strategy:
@@ -189,13 +189,22 @@ jobs:
       matrix:
         include:
           # x64: the one-line installer (install.ps1), then uninstall removing everything.
-          - arch: x64
+          - label: x64
+            arch: x64
             runner: windows-2025
             options: -ViaScript -RemoveCable
           # ARM64: the installer directly, then uninstall keeping VB-CABLE and settings.
-          - arch: arm64
+          - label: arm64
+            arch: arm64
             runner: windows-11-arm
             options: ''
+          # x64: a PC with the last version named Pitch Shift (running) updated by the installer,
+          # then uninstall removing everything.
+          - label: x64-update
+            arch: x64
+            runner: windows-2025
+            options: -FromOld old/PitchShift-Setup.exe -RemoveCable
+            old: v3.5.0
     steps:
       - uses: actions/checkout@v7
 
@@ -209,13 +218,25 @@ jobs:
           name: app-${{ matrix.arch }}
           path: dist
 
+      - name: Get the older version (Pitch Shift ${{ matrix.old }})
+        if: matrix.old
+        run: |
+          New-Item -ItemType Directory -Force old | Out-Null
+          $base = 'https://github.com/${{ github.repository }}/releases/download/${{ matrix.old }}'
+          foreach ($f in 'PitchShift-Setup.exe', 'PitchShift-Setup.exe.sha256') {
+            Invoke-WebRequest -Uri "$base/$f" -OutFile "old/$f" -MaximumRetryCount 3 -RetryIntervalSec 5
+          }
+          $expected = ((Get-Content old/PitchShift-Setup.exe.sha256 -Raw).Trim() -split '\s+')[0]
+          $actual = (Get-FileHash -Algorithm SHA256 old/PitchShift-Setup.exe).Hash
+          if ($expected -ne $actual) { throw "PitchShift-Setup.exe doesn't match its checksum" }
+
       - name: Install, use, update and uninstall
-        run: ./windows/installer/ci/test-install.ps1 -Setup installer/PitchShift-Setup.exe -Tool dist/PitchShiftTool.exe -Out install-out ${{ matrix.options }}
+        run: ./windows/installer/ci/test-install.ps1 -Setup installer/Swoopy-Setup.exe -Tool dist/SwoopyTool.exe -Out install-out ${{ matrix.options }}
 
       - uses: actions/upload-artifact@v7
         if: always()
         with:
-          name: install-test-${{ matrix.arch }}
+          name: install-test-${{ matrix.label }}
           path: install-out/
           if-no-files-found: ignore
 
@@ -232,7 +253,7 @@ jobs:
           name: installer
           path: installer
 
-      - name: Upload PitchShift-Setup.exe to the release
+      - name: Upload Swoopy-Setup.exe to the release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload "${{ github.event.release.tag_name }}" installer/PitchShift-Setup.exe installer/PitchShift-Setup.exe.sha256 --clobber --repo "${{ github.repository }}"
+        run: gh release upload "${{ github.event.release.tag_name }}" installer/Swoopy-Setup.exe installer/Swoopy-Setup.exe.sha256 --clobber --repo "${{ github.repository }}"

@@ -6,21 +6,21 @@ using System.Text;
 
 namespace PitchShift;
 
-// "Pitch Shift Diagnostics" (Start menu): writes a report about this PC's sound setup to the Desktop,
-// for sending along with a bug report. PitchShift.exe --diag [--out file]
+// "Swoopy Diagnostics" (Start menu): writes a report about this PC's sound setup to the Desktop,
+// for sending along with a bug report. Swoopy.exe --diag [--out file]
 static class Diagnostics
 {
     public static string Write(string? outPath)
     {
         var report = new StringBuilder();
-        report.AppendLine("Pitch Shift diagnostics");
+        report.AppendLine("Swoopy diagnostics");
         report.AppendLine($"Made: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
         report.AppendLine($"App: {AppVersion} ({RuntimeInformation.ProcessArchitecture})");
         report.AppendLine($"Windows: {RuntimeInformation.OSDescription} ({RuntimeInformation.OSArchitecture})");
         report.AppendLine($"Engine: {Engine.Version}");
         report.AppendLine();
 
-        report.AppendLine("== Pitch Shift right now ==");
+        report.AppendLine("== Swoopy right now ==");
         report.AppendLine(SingleInstance.Send("status", out var status, 2000) ? status : "(not running)");
         report.AppendLine();
 
@@ -28,7 +28,7 @@ static class Diagnostics
         report.AppendLine(ReadText(Settings.DefaultPath) ?? "(none yet)");
         report.AppendLine();
 
-        report.AppendLine("== Sound setup (PitchShiftTool diag) ==");
+        report.AppendLine("== Sound setup (SwoopyTool diag) ==");
         report.AppendLine(RunTool("diag"));
         report.AppendLine();
 
@@ -36,7 +36,7 @@ static class Diagnostics
         report.AppendLine(ReadText(Log.PathName) ?? "(empty)");
 
         var path = outPath ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory),
-            "Pitch Shift diagnostics.txt");
+            "Swoopy diagnostics.txt");
         Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(path))!);
         File.WriteAllText(path, report.ToString(), new UTF8Encoding(false));
         if (outPath is null)
@@ -59,8 +59,8 @@ static class Diagnostics
 
     static string RunTool(string args)
     {
-        var tool = Path.Combine(AppContext.BaseDirectory, "PitchShiftTool.exe");
-        if (!File.Exists(tool)) return "(PitchShiftTool.exe is missing)";
+        var tool = Path.Combine(AppContext.BaseDirectory, "SwoopyTool.exe");
+        if (!File.Exists(tool)) return "(SwoopyTool.exe is missing)";
         try
         {
             using var p = Process.Start(new ProcessStartInfo(tool, args)

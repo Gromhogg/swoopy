@@ -1,4 +1,4 @@
-# Pitch Shift for Windows: the sound engine (PitchShiftEngine.dll), the helper tool (PitchShiftTool.exe)
+# Swoopy for Windows: the sound engine (SwoopyEngine.dll), the helper tool (SwoopyTool.exe)
 # and the tests. The sound math in engine/dsp has no Windows code, so its tests also build on the Mac.
 #
 #   Windows:  cmake -S windows -B build -A x64   (or -A ARM64)
@@ -144,11 +144,11 @@ if(WIN32)
   target_link_libraries(ps_win PUBLIC ps_dsp ole32 oleaut32 uuid mmdevapi avrt propsys shlwapi version advapi32
     bcrypt setupapi newdev urlmon)
 
-  add_library(PitchShiftEngine SHARED engine/api/engine_api.cpp engine/api/engine.rc)
-  target_compile_definitions(PitchShiftEngine PRIVATE PS_ENGINE_BUILD)
-  target_link_libraries(PitchShiftEngine PRIVATE ps_win)
+  add_library(SwoopyEngine SHARED engine/api/engine_api.cpp engine/api/engine.rc)
+  target_compile_definitions(SwoopyEngine PRIVATE PS_ENGINE_BUILD)
+  target_link_libraries(SwoopyEngine PRIVATE ps_win)
 
-  add_executable(PitchShiftTool
+  add_executable(SwoopyTool
     tool/diag.cpp
     tool/e2e.cpp
     tool/main.cpp
@@ -158,10 +158,10 @@ if(WIN32)
     tool/setup.cpp
     tool/tonegen.cpp
     tool/tool.rc)
-  target_include_directories(PitchShiftTool PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-  target_link_libraries(PitchShiftTool PRIVATE ps_win)
+  target_include_directories(SwoopyTool PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+  target_link_libraries(SwoopyTool PRIVATE ps_win)
 
   # Put everything in one folder (build/out/Release) so it's easy to find and pack.
-  set_target_properties(PitchShiftEngine PitchShiftTool dsp_tests PROPERTIES
+  set_target_properties(SwoopyEngine SwoopyTool dsp_tests PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/out)
 endif()

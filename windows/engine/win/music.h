@@ -34,7 +34,7 @@ public:
     MusicPath(const MusicPath&) = delete;
     MusicPath& operator=(const MusicPath&) = delete;
 
-    void start_all();                                     // everything except Pitch Shift itself
+    void start_all();                                     // everything except Swoopy itself
     void start_apps(const std::vector<std::wstring>& exe_paths);  // apps by program file; each joins when it opens
     void start_pids(const std::vector<DWORD>& pids);      // processes and everything they started
     void start_pid(DWORD pid) { start_pids({pid}); }

@@ -1,8 +1,8 @@
-# Pitch Shift 3.2: an AI voice without stutters or buzz (toward "absolute realism"), plus "Higher when fast"
+# Swoopy 3.2: an AI voice without stutters or buzz (toward "absolute realism"), plus "Higher when fast"
 
 ## Context
 
-Pitch Shift 3.1.1 (installed, main = f7757c3) has an AI voice changer ("Faster ↔ More real" slider). The owner says it
+Swoopy 3.1.1 (installed, main = f7757c3) has an AI voice changer ("Faster ↔ More real" slider). The owner says it
 **still stutters even at the most-real end (about 1 s of delay) and sounds buzzy even at the highest levels**. The goal
 is absolute realism, free, on this Mac (M3 Pro, 18 GB). Discord, a game and a browser usually run at the same time.
 The card does **not** say "backup voice" when it stutters, so the joins between pieces and the pitch feed are part of
@@ -65,7 +65,7 @@ number"); app flags `--render-voice`, `--test-voice --watch`, `--changer-tune`, 
 - Every change behind a `voicestream_tune` / `voicechanger_tune` key whose "old" value gives 3.1.1's output byte for byte.
 - Changer-off renders byte-identical 14/14 (`r311/check1.sh`); Natural renders 15/15 identical to 3.1.1.
 - While the owner's app is open: render with `--compute cpu`; no GPU-load tests and no live mic tests (they need `--list`
-  to show Pitch Shift Mic and every mic not in use). Never run the app with a flag it doesn't know.
+  to show Swoopy Mic and every mic not in use). Never run the app with a flag it doesn't know.
 
 ## Why paid tools (Voicemod, Supertone Shift) sound good, and what we can match
 

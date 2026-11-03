@@ -2,7 +2,7 @@
   "name": "pitch-shift-pro-server",
   "private": true,
   "version": "1.0.0",
-  "description": "Pitch Shift Pro unlock keys: a Cloudflare Worker (Stripe webhook, thank-you page, activation).",
+  "description": "Swoopy Pro unlock keys: a Cloudflare Worker (Stripe webhook, thank-you page, activation).",
   "license": "GPL-3.0-or-later",
   "type": "module",
   "scripts": {

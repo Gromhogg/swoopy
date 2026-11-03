@@ -1,4 +1,4 @@
-# Pitch Shift Pro: the $5 unlock key (plan)
+# Swoopy Pro: the $5 unlock key (plan)
 
 Written 2026-10-15 for the owner's decision: "The voice changer, the sliders (all sliders), the deeper when slow, and
 the soundboard" are paid; Advanced processing stays free; the voice style stays on Cartoon in the free version.
@@ -16,9 +16,9 @@ cbsweetland@gmail.com) and I send them a key over email directly. This also make
 free." So there is no Stripe and no server for now. Sections 2, 4, 5, 6 and 9 below describe the Stripe version; they
 are kept for later and are not what the app does today. Section 10 is done (branch `v3-pro`).
 
-- **How someone gets Pro:** in the app, **Unlock Pro** (title bar, the Pitch Shift menu, or a click on anything
-  locked) opens a small window: "Pitch Shift Pro: $5", what it adds, "Email cbsweetland@gmail.com for a key", an
-  **Email for a key** button (a new email in Mail, subject "Pitch Shift Pro key"), the key box and **Unlock**. The
+- **How someone gets Pro:** in the app, **Unlock Pro** (title bar, the Swoopy menu, or a click on anything
+  locked) opens a small window: "Swoopy Pro: $5", what it adds, "Email cbsweetland@gmail.com for a key", an
+  **Email for a key** button (a new email in Mail, subject "Swoopy Pro key"), the key box and **Unlock**. The
   owner makes a key and emails it back; the person pastes it and clicks Unlock. No internet is needed for that.
 - **The key (until 2026-10-19; now "older keys", see "Signed keys" below):** still 25 characters in 5 groups from `23456789ABCDEFGHJKMNPQRSTUVWXYZ`. The first 5 are a random
   serial number, the next 16 come from HMAC-SHA-256 of `"PSPRO2:" + serial` with the owner's secret (each from two
@@ -46,7 +46,7 @@ are kept for later and are not what the app does today. Section 10 is done (bran
 - **The Terminal options follow the lock (2026-10-19):** before, the hidden Terminal options (`--render-voice …
   --voice Woman`, `--test-voice`, `--render-sounds` and so on) ignored the lock, so a locked copy could still make
   the paid sounds from Terminal. Now a locked copy plays every Terminal mode as the free version does, like the
-  window: the paid options are ignored with one note ("Pitch Shift Pro is locked: --voice ignored (free version)"),
+  window: the paid options are ignored with one note ("Swoopy Pro is locked: --voice ignored (free version)"),
   and the Soundboard modes and adding, renaming or removing voices stop with a message. `--as-free` does the same in
   any copy. Two more ways around the lock were closed: `--pro-secret` (a test option) could unlock the window and the
   sound with a home-made key, so it now only works for checking keys; and the hidden picture mode (`--preview`, which
@@ -104,7 +104,7 @@ are kept for later and are not what the app does today. Section 10 is done (bran
 | Soundboard (the Sounds button) | locked | yes |
 | Voice changer card and everything in it (when that branch is merged) | locked (off) | yes |
 
-- A locked control is dimmed and shows a small lock. Pointing at it says "Pitch Shift Pro". Clicking it does
+- A locked control is dimmed and shows a small lock. Pointing at it says "Swoopy Pro". Clicking it does
   nothing except open the unlock window.
 - Settings saved while Pro was on are kept, but not used while Pro is locked. Once Pro is unlocked again they come
   back as they were.
@@ -113,13 +113,13 @@ are kept for later and are not what the app does today. Section 10 is done (bran
 
 ## 2. What the buyer sees
 
-1. In Pitch Shift: a small **Unlock Pro** button at the top right of the window (and "Unlock Pitch Shift Pro…" in
-   the Pitch Shift menu), or a click on any locked control. A small window opens: "Buy for $5", a box for the key,
+1. In Swoopy: a small **Unlock Pro** button at the top right of the window (and "Unlock Swoopy Pro…" in
+   the Swoopy menu), or a click on any locked control. A small window opens: "Buy for $5", a box for the key,
    and Unlock.
 2. "Buy for $5" opens Stripe's payment page in the browser. They pay $5.
 3. Stripe sends them to a thank-you page that shows their key right away ("We also emailed it to you"), with a Copy
    button. An email with the same key arrives a few seconds later.
-4. They paste the key into Pitch Shift and click Unlock. Done, for good, on this Mac. The same key works on all
+4. They paste the key into Swoopy and click Unlock. Done, for good, on this Mac. The same key works on all
    their Macs, as often as they like, and never runs out.
 
 ## 3. The key
@@ -145,7 +145,7 @@ are kept for later and are not what the app does today. Section 10 is done (bran
 - **Offline, forever after:** the app saves the key and the token in
   `~/Library/Application Support/Pitch Shift/Pro.json`. At every launch it checks the token's signature with the
   public key built into the app, and that the token belongs to this key and this Mac. No internet needed. The file
-  lives outside the app's settings, so removing and reinstalling Pitch Shift keeps Pro.
+  lives outside the app's settings, so removing and reinstalling Swoopy keeps Pro.
 - Editing the file can't unlock anything: without the server's private key, nobody can make a token that passes the
   check. (Anyone can change the public code itself, see "Honest limits".)
 - If the token stops passing (for example a new server key one day), the app tries the saved key again quietly when
@@ -185,7 +185,7 @@ Cloudflare KV (a simple key-value store).
 
 ## 6. Stripe
 
-- One product "Pitch Shift Pro", one price: $5.00 USD, one time. One Payment Link for it. After payment it sends the
+- One product "Swoopy Pro", one price: $5.00 USD, one time. One Payment Link for it. After payment it sends the
   buyer to `https://<worker>/thanks?session_id={CHECKOUT_SESSION_ID}`.
 - A webhook to `https://<worker>/stripe-webhook` with the events `checkout.session.completed`,
   `checkout.session.async_payment_succeeded` and `charge.refunded`.
@@ -215,7 +215,7 @@ remove the lock (the Terminal test modes follow the lock since 2026-10-19). The 
 anyone they share the app with) may ask for the source code, and must be given it. This is the usual "pay for the
 convenient, ready-made build" model, and it's fine for a $5 app. A closed-source paid app would be different: Rubber
 Band is GPL and would need Breakfast Quay's commercial licence (£590 one-time with a credit in the app, £1,490 for a
-small publisher with no credit), and Pitch Shift Mic is built from BlackHole (GPL-3), which would need its own
+small publisher with no credit), and Swoopy Mic is built from BlackHole (GPL-3), which would need its own
 permission from Existential Audio (no public price found) or a different virtual mic.
 
 ## 9. The owner's checklist (in this order)
@@ -236,7 +236,7 @@ unsigned, like now).
    `https://pitch-shift-pro.NAME.workers.dev`.
 6. `npm run make-keys` → stores the two server-made secrets and prints the **public key**. Put the address (step 5)
    and the public key into `Sources/ProConfig.swift` (`server`, `publicKey`).
-7. **Stripe product:** Product catalog → **+ Add product** → name "Pitch Shift Pro", **One-off**, **5.00 USD** →
+7. **Stripe product:** Product catalog → **+ Add product** → name "Swoopy Pro", **One-off**, **5.00 USD** →
    save.
 8. **Payment link:** on the product, **Create payment link** → **After the payment** tab → instead of the
    confirmation page, **redirect customers to your website** →
@@ -248,13 +248,13 @@ unsigned, like now).
    `charge.refunded` → **Continue** → **Webhook endpoint** → **Continue** → Endpoint URL
    `https://pitch-shift-pro.NAME.workers.dev/stripe-webhook` → create → **Reveal secret** → in Terminal
    `npx wrangler secret put STRIPE_WEBHOOK_SECRET` and paste it.
-10. **Restricted key:** API keys → **Create restricted key** → start from zero permissions → name "Pitch Shift Pro
+10. **Restricted key:** API keys → **Create restricted key** → start from zero permissions → name "Swoopy Pro
     server" → **Checkout Sessions: Read**, everything else None → **Create key** → `npx wrangler secret put
     STRIPE_SECRET_KEY` and paste it.
 11. **Email (optional):** buy a domain (Cloudflare → Domain Registration → Register Domains, about $10 a year) →
     resend.com → sign up → **Domains → Add domain** → let it add the DNS records on Cloudflare → **Verify** → **API
     Keys → Create API key** (sending access) → `npx wrangler secret put RESEND_API_KEY` → in `wrangler.toml` set
-    `EMAIL_FROM = "Pitch Shift <keys@YOURDOMAIN>"` (and `SUPPORT_EMAIL` if you want an address for questions) →
+    `EMAIL_FROM = "Swoopy <keys@YOURDOMAIN>"` (and `SUPPORT_EMAIL` if you want an address for questions) →
     `npm run deploy`.
 12. **Test a $5 test-mode purchase:** the main session builds a test app with `ProConfig.swift` filled in. Open it →
     **Unlock Pro** → **Buy for $5** → card `4242 4242 4242 4242`, any future date, any 3 digits, any ZIP → the

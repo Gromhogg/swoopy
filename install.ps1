@@ -1,20 +1,20 @@
-# Pitch Shift for Windows (beta): installs or updates Pitch Shift. Paste this into PowerShell:
+# Swoopy for Windows (beta): installs or updates Swoopy. Paste this into PowerShell:
 #
-#   irm https://raw.githubusercontent.com/Gromhogg/pitch-shift/main/install.ps1 | iex
+#   irm https://raw.githubusercontent.com/Gromhogg/swoopy/main/install.ps1 | iex
 #
-# It finds the newest Pitch Shift release on GitHub, downloads PitchShift-Setup.exe, checks it against
+# It finds the newest Swoopy release on GitHub, downloads Swoopy-Setup.exe, checks it against
 # its SHA-256 file, and runs it. Windows asks for permission once ("Do you want to allow this app...?").
-# Running it again updates Pitch Shift.
+# Running it again updates Swoopy.
 #
 # Works in Windows PowerShell 5.1 and PowerShell 7. Uses "return" (not "exit") so your window stays open.
 
-function Install-PitchShift {
+function Install-Swoopy {
     $ErrorActionPreference = 'Stop'
     $ProgressPreference = 'SilentlyContinue'  # makes downloads much faster in Windows PowerShell
-    $repo = 'Gromhogg/pitch-shift'
+    $repo = 'Gromhogg/swoopy'
 
     Write-Host ''
-    Write-Host 'Pitch Shift for Windows (beta)' -ForegroundColor Magenta
+    Write-Host 'Swoopy for Windows (beta)' -ForegroundColor Magenta
     Write-Host ''
 
     # GitHub needs TLS 1.2.
@@ -23,13 +23,13 @@ function Install-PitchShift {
     # Windows 11 or newer (build 22000+).
     $build = [Environment]::OSVersion.Version.Build
     if ([Environment]::OSVersion.Platform -ne 'Win32NT' -or $build -lt 22000) {
-        Write-Host "Pitch Shift needs Windows 11. This PC has Windows build $build." -ForegroundColor Red
+        Write-Host "Swoopy needs Windows 11. This PC has Windows build $build." -ForegroundColor Red
         return
     }
 
-    $work = Join-Path ([IO.Path]::GetTempPath()) ('PitchShiftInstall-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
+    $work = Join-Path ([IO.Path]::GetTempPath()) ('SwoopyInstall-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
     New-Item -ItemType Directory -Force -Path $work | Out-Null
-    $setup = Join-Path $work 'PitchShift-Setup.exe'
+    $setup = Join-Path $work 'Swoopy-Setup.exe'
     $shaFile = "$setup.sha256"
 
     if ($env:PITCHSHIFT_SETUP_EXE) {
@@ -42,26 +42,30 @@ function Install-PitchShift {
         Write-Host 'Looking for the newest version...'
         try {
             $releases = Invoke-RestMethod -UseBasicParsing -Uri "https://api.github.com/repos/$repo/releases?per_page=30" `
-                -Headers @{ 'User-Agent' = 'PitchShift-Installer'; 'Accept' = 'application/vnd.github+json' }
+                -Headers @{ 'User-Agent' = 'Swoopy-Installer'; 'Accept' = 'application/vnd.github+json' }
         } catch {
             Write-Host "Couldn't reach GitHub. Check your internet connection and try again." -ForegroundColor Red
             Write-Host "($($_.Exception.Message))"
             return
         }
         $release = $null
+        $asset = $null
         foreach ($r in $releases) {
             if ($r.draft) { continue }
             $names = @($r.assets | ForEach-Object { $_.name })
-            if ($names -contains 'PitchShift-Setup.exe' -and $names -contains 'PitchShift-Setup.exe.sha256') { $release = $r; break }
+            # Releases from before the name Swoopy have PitchShift-Setup.exe.
+            $asset = @('Swoopy-Setup.exe', 'PitchShift-Setup.exe') |
+                Where-Object { $names -contains $_ -and $names -contains "$_.sha256" } | Select-Object -First 1
+            if ($asset) { $release = $r; break }
         }
         if (-not $release) {
-            Write-Host "There's no Windows version of Pitch Shift to download yet." -ForegroundColor Red
+            Write-Host "There's no Windows version of Swoopy to download yet." -ForegroundColor Red
             return
         }
         $version = $release.tag_name
-        Write-Host "Downloading Pitch Shift $version..."
-        $exeUrl = ($release.assets | Where-Object { $_.name -eq 'PitchShift-Setup.exe' }).browser_download_url
-        $shaUrl = ($release.assets | Where-Object { $_.name -eq 'PitchShift-Setup.exe.sha256' }).browser_download_url
+        Write-Host "Downloading Swoopy $version..."
+        $exeUrl = ($release.assets | Where-Object { $_.name -eq $asset }).browser_download_url
+        $shaUrl = ($release.assets | Where-Object { $_.name -eq "$asset.sha256" }).browser_download_url
         try {
             Invoke-WebRequest -UseBasicParsing -Uri $exeUrl -OutFile $setup
             Invoke-WebRequest -UseBasicParsing -Uri $shaUrl -OutFile $shaFile
@@ -84,13 +88,13 @@ function Install-PitchShift {
 
     Write-Host ''
     Write-Host 'Click Yes when Windows asks.' -ForegroundColor Yellow
-    Write-Host 'If VB-Audio''s window opens, click "Install Driver" (this adds Pitch Shift Mic for your voice).'
+    Write-Host 'If VB-Audio''s window opens, click "Install Driver" (this adds Swoopy Mic for your voice).'
     Write-Host ''
-    # Setup asks Windows for permission itself, so Pitch Shift opens afterwards as you (not as administrator).
+    # Setup asks Windows for permission itself, so Swoopy opens afterwards as you (not as administrator).
     $setupArgs = @('/SILENT', '/SUPPRESSMSGBOXES', '/NORESTART')
     if ($env:PITCHSHIFT_SETUP_ARGS) { $setupArgs += $env:PITCHSHIFT_SETUP_ARGS -split ' ' }  # GitHub checks only
     try {
-        # Not "-Wait": that would also wait for Pitch Shift itself, which Setup opens at the end.
+        # Not "-Wait": that would also wait for Swoopy itself, which Setup opens at the end.
         $p = Start-Process -FilePath $setup -ArgumentList $setupArgs -PassThru
         $null = $p.Handle  # keeps the exit code readable
         $p.WaitForExit()
@@ -107,16 +111,16 @@ function Install-PitchShift {
     } catch { }
 
     if ($code -eq 0) {
-        Write-Host "Pitch Shift $version is installed." -ForegroundColor Green
+        Write-Host "Swoopy $version is installed." -ForegroundColor Green
         Write-Host 'Open it any time from the Start menu or the Desktop.'
-        if ($restart) { Write-Host 'Restart your PC to finish setting up Pitch Shift Mic (for your voice).' -ForegroundColor Yellow }
+        if ($restart) { Write-Host 'Restart your PC to finish setting up Swoopy Mic (for your voice).' -ForegroundColor Yellow }
     } elseif ($code -eq 1 -or $code -eq 2 -or $code -eq 5) {
         # 1-2: Setup stopped before installing (for example "No" when Windows asked). 5: cancelled and undone.
         Write-Host 'Setup stopped before it finished. Nothing was changed.' -ForegroundColor Yellow
     } else {
-        Write-Host "Installing didn't finish (code $code). Please try again, or download PitchShift-Setup.exe from" -ForegroundColor Red
+        Write-Host "Installing didn't finish (code $code). Please try again, or download Swoopy-Setup.exe from" -ForegroundColor Red
         Write-Host "https://github.com/$repo/releases"
     }
 }
 
-Install-PitchShift
+Install-Swoopy

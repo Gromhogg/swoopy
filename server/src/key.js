@@ -1,4 +1,4 @@
-// Pitch Shift Pro keys: 25 characters shown as XXXXX-XXXXX-XXXXX-XXXXX-XXXXX.
+// Swoopy Pro keys: 25 characters shown as XXXXX-XXXXX-XXXXX-XXXXX-XXXXX.
 // Only 31 characters are used, none that can be read two ways (no 0/O, no 1/I/L).
 // The first 21 characters are the secret part (31^21 ≈ 2^104). The last 4 are a check part, so a typo is caught
 // before anything is sent anywhere (the Mac app does the same check: Sources/Pro.swift, ProKey).

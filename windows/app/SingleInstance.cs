@@ -7,14 +7,14 @@ using System.Windows.Threading;
 
 namespace PitchShift;
 
-// Only one Pitch Shift runs at a time. Starting it again sends the running one a short command
+// Only one Swoopy runs at a time. Starting it again sends the running one a short command
 // ("show", "quit", "status", "shot <file>") through a named pipe.
 static class SingleInstance
 {
     public const string MutexName = @"Local\PitchShift.App";
     static string PipeName => $"PitchShift.App.{Process.GetCurrentProcess().SessionId}";
 
-    // Sends one command to the running Pitch Shift. Gives false if none answers.
+    // Sends one command to the running Swoopy. Gives false if none answers.
     public static bool Send(string command, out string reply, int timeoutMs = 5000)
     {
         reply = "";

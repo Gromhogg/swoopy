@@ -1,5 +1,5 @@
 #!/bin/bash
-# Pitch Shift Pro keys, for the owner. People email for a key; this makes one, and you email it back.
+# Swoopy Pro keys, for the owner. People email for a key; this makes one, and you email it back.
 #
 #   tools/pro-keys.sh setup                        makes your key pair, once (never replaces one that's there)
 #   tools/pro-keys.sh new "their name or email"   makes a key, prints it, and adds it to the list

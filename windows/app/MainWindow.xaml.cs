@@ -263,7 +263,7 @@ public partial class MainWindow : Window
         else TestButton.ClearValue(BackgroundProperty);
         TestButton.IsEnabled = st.TestState != "idle" || (s.VoiceOn && canWork);
 
-        // "● Pitch Shift Mic" (green and pulsing while a call app listens), or the one button that's needed.
+        // "● Swoopy Mic" (green and pulsing while a call app listens), or the one button that's needed.
         var nextAction = PickerText.Action(st, restartNeeded);
         ActionButton.Content = PickerText.ActionTitle(nextAction);
         ActionButton.IsEnabled = !settingUp;
@@ -276,8 +276,8 @@ public partial class MainWindow : Window
         }
         var live = s.VoiceOn && canWork && st.InUse;
         MicDot.IsLive = live;
-        MicStatus.ToolTip = live ? "An app is using Pitch Shift Mic" : "Choose Pitch Shift Mic as the microphone in Discord, Zoom or any app";
-        AutomationProperties.SetName(MicStatus, live ? "Pitch Shift Mic, in use" : "Pitch Shift Mic, not in use");
+        MicStatus.ToolTip = live ? "An app is using Swoopy Mic" : "Choose Swoopy Mic as the microphone in Discord, Zoom or any app";
+        AutomationProperties.SetName(MicStatus, live ? "Swoopy Mic, in use" : "Swoopy Mic, not in use");
     }
 
     string WaitingTip()
@@ -535,7 +535,7 @@ public partial class MainWindow : Window
                 Open("ms-settings:privacy-microphone");
                 break;
             case VoiceAction.Restart:
-                if (MessageBox.Show(this, "Restart Windows now to finish setting up Pitch Shift Mic?", "Pitch Shift",
+                if (MessageBox.Show(this, "Restart Windows now to finish setting up Swoopy Mic?", "Swoopy",
                         MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes)
                     Run("shutdown.exe", "/r /t 0", elevated: false);
                 break;
@@ -545,10 +545,10 @@ public partial class MainWindow : Window
         }
     }
 
-    // Runs "PitchShiftTool setup-mic" as administrator (Windows asks first). It shows VB-Audio's own window.
+    // Runs "SwoopyTool setup-mic" as administrator (Windows asks first). It shows VB-Audio's own window.
     async void RepairMic()
     {
-        var tool = Path.Combine(AppContext.BaseDirectory, "PitchShiftTool.exe");
+        var tool = Path.Combine(AppContext.BaseDirectory, "SwoopyTool.exe");
         if (!File.Exists(tool) || preview is not null)
         {
             SystemSounds.Beep.Play();
@@ -626,7 +626,7 @@ public partial class MainWindow : Window
     {
         if (preview is null && !App.Quitting)
         {
-            // Closing the window keeps Pitch Shift running in the tray.
+            // Closing the window keeps Swoopy running in the tray.
             e.Cancel = true;
             HearCard.Amount.Finish(apply: true);
             VoiceCard.Amount.Finish(apply: true);

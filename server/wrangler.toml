@@ -1,4 +1,4 @@
-# Pitch Shift Pro unlock server. Secrets are NOT in this file: they are stored on Cloudflare with
+# Swoopy Pro unlock server. Secrets are NOT in this file: they are stored on Cloudflare with
 # "npx wrangler secret put NAME" (see README.md): STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, SIGNING_KEY, KEY_SECRET,
 # RESEND_API_KEY.
 name = "pitch-shift-pro"
@@ -19,11 +19,11 @@ namespace_id = "7301"
 simple = { limit = 10, period = 60 }
 
 [vars]
-# "true" while testing with Stripe's test mode; "false" once Pitch Shift Pro is sold for real.
+# "true" while testing with Stripe's test mode; "false" once Swoopy Pro is sold for real.
 ALLOW_TEST_KEYS = "true"
 # The Payment Link's id (plink_…) so only that link makes keys. Empty = any paid Checkout Session.
 STRIPE_PAYMENT_LINK = ""
-# The sender for the key email, on a domain verified in Resend, e.g. "Pitch Shift <keys@example.com>".
+# The sender for the key email, on a domain verified in Resend, e.g. "Swoopy <keys@example.com>".
 # Empty = no email (the thank-you page tells the buyer to save the key).
 EMAIL_FROM = ""
 # Optional: shown in the email as the address for questions (or set it as a secret to keep it out of this file).

@@ -26,7 +26,7 @@ public sealed record EngineStatus
     public bool? CablePresent { get; init; }            // null = not known yet
     public bool CableRestartNeeded { get; init; }       // setup put VB-CABLE in, but Windows needs a restart
                                                         // (false when VB-Audio's window was closed without installing)
-    public bool InUse { get; init; }                    // a call app is using Pitch Shift Mic
+    public bool InUse { get; init; }                    // a call app is using Swoopy Mic
     public string TestState { get; init; } = "idle";    // idle, recording, playing
     public int TestSecondsLeft { get; init; }
 
@@ -174,7 +174,7 @@ public static class PickerText
     public static string ActionTitle(VoiceAction action) => action switch
     {
         VoiceAction.Restart => "Restart to finish setup",
-        VoiceAction.Repair => "Repair Pitch Shift Mic",
+        VoiceAction.Repair => "Repair Swoopy Mic",
         VoiceAction.AllowMic => "Allow microphone",
         _ => "",
     };

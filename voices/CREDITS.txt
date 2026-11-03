@@ -1,6 +1,6 @@
-Pitch Shift voice changer voices
+Swoopy voice changer voices
 
-Woman and Man voices: trained by the Pitch Shift project on the CSTR VCTK Corpus 0.92 (Yamagishi, Veaux, MacDonald;
+Woman and Man voices: trained by the Swoopy project on the CSTR VCTK Corpus 0.92 (Yamagishi, Veaux, MacDonald;
 Centre for Speech Technology Research, University of Edinburgh), licensed CC BY 4.0
 (https://datashare.ed.ac.uk/handle/10283/3443). Each voice was trained on 8 of its speakers as one voice (Woman: the
 American speakers p294, p299, p300, p318, p333, p339, p341, p330; Man: p226, p292, p260, p298, p302, p374, p232,
@@ -16,7 +16,7 @@ Content encoder: ContentVec (auspicious3000/contentvec, MIT License), as distrib
 
 Converted to Core ML with 8-bit weights.
 
-Second voices (Pitch Shift 3.5; used only for hums, hummed tunes, laughs, sighs, breaths and singing): each started
+Second voices (Swoopy 3.5; used only for hums, hummed tunes, laughs, sighs, breaths and singing): each started
 from its main voice above (Woman / Man after 200 rounds) and was trained further on Kaggle, mostly on free recordings
 of those sounds plus some of the same VCTK speech:
   - laughs, sighs, gasps, breathing, coughs and sneezes: FSD50K (Fonseca et al., Freesound Datasets) and Freesound
@@ -26,10 +26,10 @@ of those sounds plus some of the same VCTK speech:
 Every recording used, with its author and licence, is listed in CREDITS-second-voice.txt.
 
 Sound sorter (which voice makes each piece): YAMNet (Google, tensorflow/models research/audioset/yamnet, Apache
-License 2.0: LICENSE-Apache-2.0.txt), converted to Core ML, plus one layer trained by the Pitch Shift project on
+License 2.0: LICENSE-Apache-2.0.txt), converted to Core ML, plus one layer trained by the Swoopy project on
 FSD50K and Freesound clips (CC0 / CC BY), VocalSet (CC BY 4.0) and VCTK speech (CC BY 4.0).
 
-"Block background sounds" voices (Pitch Shift 3.5; an optional switch, off unless turned on): each started from its
+"Block background sounds" voices (Swoopy 3.5; an optional switch, off unless turned on): each started from its
 main voice above (Woman / Man after 200 rounds) and was trained 40 more rounds on Kaggle on the same VCTK recordings,
 with room and desk sounds mixed under the speech it hears (it still had to make the clean speech), so it leaves such
 sounds out. Only the part that reads the speech learned; the part that makes the sound of the voice was kept as it

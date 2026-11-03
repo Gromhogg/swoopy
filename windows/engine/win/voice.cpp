@@ -99,7 +99,7 @@ std::wstring VoicePath::default_mic_id() {
 }
 
 bool VoicePath::cable_in_use(const std::wstring& mic_id) const {
-    // Is any other program recording from Pitch Shift Mic right now (a call app)?
+    // Is any other program recording from Swoopy Mic right now (a call app)?
     try {
         auto device = device_by_id(mic_id);
         ComPtr<IAudioSessionManager2> manager;
@@ -303,7 +303,7 @@ void VoicePath::tick() {
         state = restart_needed_ ? "restart_needed" : "cable_missing";
     } else {
         if (!took_default_) {
-            // Pitch Shift Mic becomes the default microphone (the old defaults are written down first).
+            // Swoopy Mic becomes the default microphone (the old defaults are written down first).
             took_default_ = true;
             take_default_mic(cable_.mic_id);
             update_sign_in_safety_net(restore_command_);
@@ -340,7 +340,7 @@ void VoicePath::tick() {
             retry_after_ = now + std::chrono::milliseconds(500);
         }
         if (feed_ && FAILED(feed_->error())) {
-            error = "Pitch Shift Mic stopped: " + hr_text(feed_->error());
+            error = "Swoopy Mic stopped: " + hr_text(feed_->error());
             stop_chain();
             retry_after_ = now + std::chrono::milliseconds(500);
         }

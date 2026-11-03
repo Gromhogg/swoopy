@@ -25,7 +25,7 @@ final class VoiceModelStore {
     var onChange: () -> Void = {}            // called on the main thread when `status` changes
     private var wanted: String?              // the voice id asked for last (nil = none)
     private var retired: [OpaquePointer] = [] // models of a voice no longer wanted, freed once no chain uses them
-    private let queue = DispatchQueue(label: "Pitch Shift AI voice loading", qos: .userInitiated)
+    private let queue = DispatchQueue(label: "Swoopy AI voice loading", qos: .userInitiated)
 
     // True until this voice has been loaded once on this Mac (then macOS keeps the prepared models).
     func firstTime(_ entry: VoiceEntry, quiet: Bool = false) -> Bool {

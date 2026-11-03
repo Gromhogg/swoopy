@@ -1,5 +1,5 @@
 YAMNet (the sound sorter's network) is by Google (tensorflow/models, research/audioset/yamnet) and is licensed under
-the Apache License, Version 2.0, below. Pitch Shift converted it to Core ML and added one trained layer.
+the Apache License, Version 2.0, below. Swoopy converted it to Core ML and added one trained layer.
 
                                  Apache License
                            Version 2.0, January 2004

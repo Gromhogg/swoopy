@@ -26,8 +26,8 @@ private:
 };
 
 std::wstring self_path();   // this program's own .exe
-std::wstring module_dir();  // the folder of the file this code is in (PitchShift.exe's or the engine DLL's folder)
-std::wstring tool_path();   // PitchShiftTool.exe next to it
+std::wstring module_dir();  // the folder of the file this code is in (Swoopy.exe's or the engine DLL's folder)
+std::wstring tool_path();   // SwoopyTool.exe next to it
 
 // Runs `exe` with `args` (no window). Throws if it can't start.
 std::unique_ptr<ChildProcess> start_process(const std::wstring& exe, const std::wstring& args);

@@ -3,7 +3,7 @@ using System.IO;
 namespace PitchShift;
 
 // For pictures of the window (used by the GitHub checks): shows a made-up state and makes no sound.
-//   PitchShift.exe --preview hear-on,voice-on,cartoon --screenshot shot.png [--theme dark] [--scale 2] [--size 900x450]
+//   Swoopy.exe --preview hear-on,voice-on,cartoon --screenshot shot.png [--theme dark] [--scale 2] [--size 900x450]
 // States: hear-on, voice-on, all, two-apps, waiting, cartoon, typing, hover, recording, playing, listening (in-use),
 //         repair, restart, allow-mic, no-mic, menu, advanced (the "Advanced processing" switch on),
 //         advanced-alert (the alert shown when turning it on).

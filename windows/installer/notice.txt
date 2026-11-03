@@ -1,16 +1,16 @@
-Pitch Shift for Windows (beta)
+Swoopy for Windows (beta)
 
-Pitch Shift changes the pitch of what you hear, and of your voice in calls, live.
+Swoopy changes the pitch of what you hear, and of your voice in calls, live.
 
 This is a beta. It has been tested on GitHub's Windows computers, not yet on many real PCs.
-If something goes wrong, open "Pitch Shift Diagnostics" from the Start menu and send the
+If something goes wrong, open "Swoopy Diagnostics" from the Start menu and send the
 report it puts on your Desktop.
 
 
-Pitch Shift Mic: VB-CABLE by VB-Audio
+Swoopy Mic: VB-CABLE by VB-Audio
 
 Your voice reaches Discord, Zoom and other call apps through VB-CABLE, a virtual audio cable
-made by VB-Audio Software (www.vb-cable.com). Pitch Shift names it "Pitch Shift Mic".
+made by VB-Audio Software (www.vb-cable.com). Swoopy names it "Swoopy Mic".
 If VB-CABLE isn't on this PC yet, Setup installs it from vb-audio.com. If VB-Audio's own
 window opens, click "Install Driver".
 
@@ -20,12 +20,12 @@ https://vb-audio.com/Cable/
 
 License
 
-Pitch Shift is free software under the GNU General Public License, version 3 or later
+Swoopy is free software under the GNU General Public License, version 3 or later
 (GPL-3.0-or-later). You may use, share and change it under those terms. It comes with
-NO WARRANTY. The full license is installed next to Pitch Shift as LICENSE.txt, and is also
+NO WARRANTY. The full license is installed next to Swoopy as LICENSE.txt, and is also
 at https://www.gnu.org/licenses/gpl-3.0.html
 
-Source code: https://github.com/Gromhogg/pitch-shift
+Source code: https://github.com/Gromhogg/swoopy
 
-Pitch Shift uses the Rubber Band Library (GPL) by Breakfast Quay for pitch shifting:
+Swoopy uses the Rubber Band Library (GPL) by Breakfast Quay for pitch shifting:
 https://breakfastquay.com/rubberband/

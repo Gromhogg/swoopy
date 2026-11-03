@@ -1,8 +1,8 @@
 // "Your voice": takes the chosen microphone, changes its pitch, and plays it into the virtual cable,
-// so call apps that use "Pitch Shift Mic" hear the shifted voice.
-// While it's on, Pitch Shift Mic is also the Windows default microphone (see mic_default.h), so
+// so call apps that use "Swoopy Mic" hear the shifted voice.
+// While it's on, Swoopy Mic is also the Windows default microphone (see mic_default.h), so
 // apps set to "Default" use it; the real microphone keeps being read for the voice.
-// Like the Mac app, it only runs while some app is actually using Pitch Shift Mic (or during Test),
+// Like the Mac app, it only runs while some app is actually using Swoopy Mic (or during Test),
 // so the microphone isn't held open when nobody listens.
 #pragma once
 #include "dsp/drift_buffer.h"
@@ -46,7 +46,7 @@ public:
     nlohmann::json status() const;
     void reset_counts();
 
-    // The microphone to read when none was picked: the default from before Pitch Shift Mic
+    // The microphone to read when none was picked: the default from before Swoopy Mic
     // became the default, else Windows' default, else any real microphone.
     static std::wstring default_mic_id();
     static constexpr double kTestSeconds = 5.0;

@@ -1,7 +1,7 @@
-# Pitch Shift Pro: fixed test keys (they unlock nothing in a real build). The key tool and the app must both accept
+# Swoopy Pro: fixed test keys (they unlock nothing in a real build). The key tool and the app must both accept
 # exactly these:
 #   tools/pro-keys.sh test
-#   "build/Pitch Shift.app/Contents/MacOS/PitchShift" --pro-test tools/pro-keys-test.txt
+#   "build/Swoopy.app/Contents/MacOS/Swoopy" --pro-test tools/pro-keys-test.txt
 #
 # Older keys (25 characters, sent out before signed keys), made with the test secret below. Each line: old, the
 # serial, the key. The tool makes them again from the secret; the app (which no longer has any secret) checks that
