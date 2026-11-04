@@ -9,7 +9,7 @@ enum ProConfig {
     // Fingerprints (SHA-256, hex) of the older 25-character keys sent out before signed keys: those still work.
     static let oldKeys: [String] = []  // filled in by build.sh; leave empty here
     // The key server (server/): a key is sent to it once, when it's entered, and it lets only the first Mac have it.
-    static let server = "https://swoopy-pro.SUBDOMAIN.workers.dev"
+    static let server = "https://swoopy-pro.swoopy-pro-server.workers.dev"
     // The key server's public key (server-signing-public.txt; not a secret): checks its answers, can't make them.
     static let serverKey = "e32e7015aadb185534ad7b6bd310c1f204a23949853e8cf28bbefd2833b73bcd"
     static let email = "cbsweetland@gmail.com"  // people email this address for a key

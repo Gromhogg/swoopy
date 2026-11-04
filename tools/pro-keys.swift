@@ -23,7 +23,7 @@ let marker = "P2"
 let oldLength = 25, signedLength = 115, serialLength = 5, signatureLength = 104
 let onceLength = 20, onceSerialLength = 4, onceSecretLength = 12
 // The key server (server/; the same address as ProConfig.server in the app).
-let serverURL = ProcessInfo.processInfo.environment["SWOOPY_PRO_SERVER"] ?? "https://swoopy-pro.SUBDOMAIN.workers.dev"
+let serverURL = ProcessInfo.processInfo.environment["SWOOPY_PRO_SERVER"] ?? "https://swoopy-pro.swoopy-pro-server.workers.dev"
 
 let folder = URL(fileURLWithPath: ProcessInfo.processInfo.environment["PITCH_SHIFT_KEYS_DIR"]
     ?? NSHomeDirectory() + "/Library/Application Support/Pitch Shift Keys")

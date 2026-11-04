@@ -37,8 +37,9 @@ On the owner's Cloudflare account (`account_id` in `wrangler.toml`), in this fol
 2. The two secrets, straight from the files (nothing is printed):
    `tr -d ' \n' < "$HOME/Library/Application Support/Pitch Shift Keys/server-secret.txt" | npx wrangler secret put KEY_SECRET`
    and the same with `server-signing-private.txt` for `SIGNING_KEY`.
-3. `npm run deploy`. Its address goes in `../Sources/ProConfig.swift` (`server`) and `../tools/pro-keys.swift`
-   (`serverURL`).
+3. `npm run deploy`. Its address, `https://swoopy-pro.swoopy-pro-server.workers.dev`, is in
+   `../Sources/ProConfig.swift` (`server`) and `../tools/pro-keys.swift` (`serverURL`). After a change to `src/`,
+   `npm test`, then `npm run deploy` again (keys and secrets stay as they are).
 
 ## Checking it
 

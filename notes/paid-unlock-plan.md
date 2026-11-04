@@ -20,7 +20,7 @@ a key worked on any number of Macs with no internet, so a shared key unlocked ev
 - **The key:** a 4-character serial, 12 characters from HMAC-SHA-256 of `"SWOOPY-ONCE:" + serial` with
   `server-secret.txt` (Pitch Shift Keys folder; the server has the same secret as `KEY_SECRET`), and the same
   4-character typo check. About 59 bits: with the server's 10-tries-a-minute limit, nobody can guess one.
-- **The key server** (`server/`, a Cloudflare Worker on the owner's free account, with a D1 database): when a key is
+- **The key server** (`server/`, `https://swoopy-pro.swoopy-pro-server.workers.dev`, a Cloudflare Worker on the owner's free account, with a D1 database): when a key is
   entered, the app sends it once with this Mac's id (SHA-256 of `"swoopy-pro machine:"` + the Mac's hardware id, so it
   can't be traced back). The first Mac to send a key gets it; the same Mac can send it again (a reinstall); any other
   Mac gets "That key was already used on another Mac. Each key unlocks one Mac: email … if this is your Mac." Two
