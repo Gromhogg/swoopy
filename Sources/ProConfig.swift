@@ -1,4 +1,4 @@
-// Swoopy Pro: where to ask for a key, the price, and what keys are checked with.
+// Swoopy Pro: where to ask for a key, the price, the key server, and what keys are checked with.
 // The check data is never in git: build.sh puts it in at build time (tools/pro-config.sh), from PRO_PUBLIC_KEY or
 // ~/Library/Application Support/Pitch Shift Keys/signing-public.txt (made by tools/pro-keys.sh setup on the owner's
 // Mac), and from issued.txt in the same folder (or PRO_ISSUED) for the older keys.
@@ -8,6 +8,10 @@ enum ProConfig {
     static let publicKey = ""  // filled in by build.sh; leave empty here
     // Fingerprints (SHA-256, hex) of the older 25-character keys sent out before signed keys: those still work.
     static let oldKeys: [String] = []  // filled in by build.sh; leave empty here
+    // The key server (server/): a key is sent to it once, when it's entered, and it lets only the first Mac have it.
+    static let server = "https://swoopy-pro.SUBDOMAIN.workers.dev"
+    // The key server's public key (server-signing-public.txt; not a secret): checks its answers, can't make them.
+    static let serverKey = "e32e7015aadb185534ad7b6bd310c1f204a23949853e8cf28bbefd2833b73bcd"
     static let email = "cbsweetland@gmail.com"  // people email this address for a key
     static let price = "$5"
 }

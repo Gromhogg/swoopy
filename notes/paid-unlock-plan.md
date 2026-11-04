@@ -9,6 +9,41 @@ gated by the key.
 Mac only. The Windows (beta) app is not part of this: it stays as it is (everything free) until a Windows unlock is
 built.
 
+## What changed 2026-11-03: each key unlocks one Mac
+
+The owner: "I want to be able to tell you generate a key, and it works ... and have it be one time use." Before,
+a key worked on any number of Macs with no internet, so a shared key unlocked everyone. Now:
+
+- **Making a key:** `tools/pro-keys.sh new "their name or email"` prints a 20-character key
+  (`XXXXX-XXXXX-XXXXX-XXXXX`) and adds it to `issued.txt`. It asks the key server first whether the key is good and
+  unused. A Claude session can do this when the owner says "make a key" (see `CLAUDE.md`).
+- **The key:** a 4-character serial, 12 characters from HMAC-SHA-256 of `"SWOOPY-ONCE:" + serial` with
+  `server-secret.txt` (Pitch Shift Keys folder; the server has the same secret as `KEY_SECRET`), and the same
+  4-character typo check. About 59 bits: with the server's 10-tries-a-minute limit, nobody can guess one.
+- **The key server** (`server/`, a Cloudflare Worker on the owner's free account, with a D1 database): when a key is
+  entered, the app sends it once with this Mac's id (SHA-256 of `"swoopy-pro machine:"` + the Mac's hardware id, so it
+  can't be traced back). The first Mac to send a key gets it; the same Mac can send it again (a reinstall); any other
+  Mac gets "That key was already used on another Mac. Each key unlocks one Mac: email … if this is your Mac." Two
+  Macs sending the same key at once can't both get it (checked: 9 at once, 1 got it).
+- **After that, no internet:** the server answers with a token signed with its private key
+  (`server-signing-private.txt`, on Cloudflare as `SIGNING_KEY`) for this key and this Mac. Pro.json keeps the key
+  and the token; the app checks the token at every launch with the public half (`ProConfig.serverKey`). A Pro.json
+  copied to another Mac doesn't unlock it.
+- **The unlock window:** the key box is one line now; Unlock shows "Checking your key…" while it asks the server.
+  No internet: "Can't reach the Swoopy Pro server. Check your internet connection and try again." The window says
+  "each key unlocks one Mac".
+- **Keys sent out before** (the owner's own: one 25-character and one signed key in `issued.txt`) are still checked
+  on the Mac alone, as before, and still work on any Mac. `tools/pro-keys.sh new` no longer makes signed keys.
+- **Older app versions** (3.5 and before) don't accept the new keys ("That isn't a whole key"): buyers need the next
+  release. The key tool says so when it makes a key.
+- **New Mac:** make the person a new key, or free the old one (`server/README.md`, "Looking things up").
+- **What a determined person can still do:** the same as before (build the app from the public code without the
+  lock, or edit the app file). What they can't do any more: share one key with friends.
+- **Back up the Pitch Shift Keys folder again:** it now also holds `server-secret.txt`,
+  `server-signing-private.txt` and `server-signing-public.txt`.
+- **Checks:** `cd server && npm test` (7), `tools/pro-keys.sh test` (22), the app's
+  `--pro-test tools/pro-keys-test.txt` (40): all three agree on the same fixed keys and the same fixed token.
+
 ## What changed 2026-10-16: emailed keys, no server
 
 The owner: "For now, let's hold off on the stripe keys for this new version: Have it where a person mails my email (at

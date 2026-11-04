@@ -94,19 +94,21 @@
 //                                              window ("Swoopy Pro is locked: ... ignored (free version)").
 // Swoopy Pro (Sources/Pro.swift, notes/paid-unlock-plan.md):
 //   --pro-status                               locked or unlocked, and why
-//   --pro-key KEY                              unlocks with a key, like the unlock window (checks it on this Mac, no
-//                                              internet, and keeps it)
+//   --pro-key KEY                              unlocks with a key, like the unlock window (sends it to the key server
+//                                              once, and keeps it with the server's answer)
 //   --pro-reset                                locks Pro again (forgets the key)
-//                [--pro-file F] [--pro-public-key HEX] [--pro-old-keys ISSUED]
-//                                              checks only: keep the key in F (any mode); check keys with another
-//                                              public key (64 hex characters) and/or the older keys listed in ISSUED
-//                                              (lines like issued.txt's), not this build's (only with --pro-key /
-//                                              --pro-status and --pro-file, or --pro-check: they never unlock the
-//                                              sound or the window)
+//                [--pro-file F] [--pro-public-key HEX] [--pro-old-keys ISSUED] [--pro-server URL]
+//                                              checks only: keep the key in F (any mode); check older keys with
+//                                              another public key (64 hex characters) and/or the older keys listed in
+//                                              ISSUED (lines like issued.txt's), not this build's; send keys to
+//                                              another key server (a test one: tools and server/README.md). Only with
+//                                              --pro-key / --pro-status and --pro-file, or --pro-check: they never
+//                                              unlock the sound or the window
 //   --pro-check F [--pro-public-key HEX] [--pro-old-keys ISSUED]
-//                                              checks only: each key in F (one per line): unlocks, typo or wrong
-//   --pro-test tools/pro-keys-test.txt         checks only: the app accepts the same fixed test keys as
-//                                              tools/pro-keys.sh, and only those
+//                                              checks only: each key in F (one per line): unlocks, typo, wrong, or
+//                                              server (no typo; only the key server can tell more)
+//   --pro-test tools/pro-keys-test.txt         checks only: the app accepts the same fixed test keys and server
+//                                              answers as tools/pro-keys.sh and server/, and only those
 import AppKit
 import AVFoundation
 import CoreAudio
@@ -146,9 +148,7 @@ let previewStates = Set((preview ?? "").split(separator: ",").map(String.init))
 
 // Swoopy Pro. Checks only: --pro-file F keeps the key in F (see --pro-public-key below).
 if let path = arg("--pro-file") { Pro.shared.file = URL(fileURLWithPath: path) }
-// There is no unlock server and no key secret any more (keys are signed, and checked on the Mac); an old test script
-// stops here instead of opening the window.
-if args.contains("--pro-server") { print("--pro-server: there is no server any more (keys are checked on this Mac)"); exit(1) }
+// There is no key secret in the app any more; an old test script stops here instead of opening the window.
 if args.contains("--pro-secret") { print("--pro-secret: there is no key secret any more (keys are signed); see --pro-public-key"); exit(1) }
 // While Swoopy Pro is locked (a build with the public key and no key that works), every mode below plays as the
 // free version does, like the window (see Free): the options for paid features are ignored with one note, and the
@@ -176,12 +176,13 @@ if asFree {
 // list; with --pro-check F, or with --pro-key / --pro-status and --pro-file F (so the real Pro.json is never
 // touched). They're read after the lock above was worked out and never reach the sound or the window: a key pair
 // anyone can make must not unlock anything.
-if arg("--pro-public-key") != nil || arg("--pro-old-keys") != nil {
+if arg("--pro-public-key") != nil || arg("--pro-old-keys") != nil || arg("--pro-server") != nil {
     guard ["--pro-check", "--pro-key", "--pro-status"].contains(where: args.contains),
           arg("--pro-file") != nil || arg("--pro-check") != nil else {
-        print("--pro-public-key, --pro-old-keys: only with --pro-check F, or with --pro-key or --pro-status and --pro-file F")
+        print("--pro-public-key, --pro-old-keys, --pro-server: only with --pro-check F, or with --pro-key or --pro-status and --pro-file F")
         exit(1)
     }
+    if let url = arg("--pro-server") { Pro.shared.server = url }
     if let hex = arg("--pro-public-key") {
         guard ProKeyCheck(publicKey: hex, oldKeys: []).publicKey != nil else { print("--pro-public-key: 64 hex characters"); exit(1) }
         Pro.shared.publicKey = hex
@@ -507,7 +508,10 @@ if args.contains("--pro-reset") {
 
 if let typed = arg("--pro-key") {
     Pro.shared.load()
-    switch Pro.shared.activate(typed) {
+    var outcome: Pro.Outcome?
+    Pro.shared.activate(typed) { outcome = $0 }
+    while outcome == nil { RunLoop.main.run(until: Date().addingTimeInterval(0.05)) }
+    switch outcome! {
     case .unlocked:
         print("Unlocked. \(Pro.shared.status)")
         exit(0)
@@ -518,18 +522,21 @@ if let typed = arg("--pro-key") {
 }
 
 // Checks only: one key per line in F; prints each with "unlocks", "typo" or "wrong" (with this build's public key and
-// list of older keys, or --pro-public-key / --pro-old-keys). Nothing is saved.
+// list of older keys, or --pro-public-key / --pro-old-keys), or "server" for a key without a typo (only the key
+// server can check the rest). Nothing is saved, nothing is sent.
 if let path = arg("--pro-check") {
     guard let text = try? String(contentsOfFile: path, encoding: .utf8) else { print("--pro-check: can't read \(path)"); exit(1) }
     var counts: [String: Int] = [:]
     for line in text.split(whereSeparator: \.isNewline) where !line.trimmingCharacters(in: .whitespaces).isEmpty {
         let typed = String(line)
         let verdict: String
-        if case .failure = ProKey.read(typed) { verdict = "typo" } else { verdict = Pro.shared.works(typed) ? "unlocks" : "wrong" }
+        if case .failure = ProKey.read(typed) { verdict = "typo" }
+        else if ProKey.kind(typed) == .once { verdict = "server" }
+        else { verdict = Pro.shared.works(typed) ? "unlocks" : "wrong" }
         counts[verdict, default: 0] += 1
         print("\(typed)\t\(verdict)")
     }
-    print("total: " + ["unlocks", "typo", "wrong"].map { "\(counts[$0] ?? 0) \($0)" }.joined(separator: ", "))
+    print("total: " + ["unlocks", "typo", "wrong", "server"].map { "\(counts[$0] ?? 0) \($0)" }.joined(separator: ", "))
     exit(0)
 }
 
@@ -539,7 +546,7 @@ if let path = arg("--pro-check") {
 // never works.
 if let path = arg("--pro-test") {
     guard let text = try? String(contentsOfFile: path, encoding: .utf8) else { print("--pro-test: can't read \(path)"); exit(1) }
-    var publicKey = "", good = 0, bad = 0
+    var publicKey = "", good = 0, bad = 0, onceKeys = 0
     let other = Curve25519.Signing.PrivateKey().publicKey.rawRepresentation.map { String(format: "%02x", $0) }.joined()
     func result(_ ok: Bool, _ what: @autoclosure () -> String) { if ok { good += 1 } else { bad += 1; print("different: \(what())") } }
     func changes(_ key: String) -> [String] {  // every one-character change of a key
@@ -549,9 +556,26 @@ if let path = arg("--pro-test") {
     for line in text.split(whereSeparator: \.isNewline) where !line.hasPrefix("#") {
         let parts = line.split(separator: " ", omittingEmptySubsequences: true).map(String.init)
         if parts.count == 2 && parts[0] == "public" { publicKey = parts[1]; continue }
+        if parts.count == 4 && parts[0] == "token" {
+            let (key, machine, token) = (parts[1], parts[2], parts[3])
+            let otherMachine = String(machine.reversed()), otherKey = "XY8WP-KRK9R-9FACV-3SF5S"
+            let changed = String(token.prefix(10)) + (token.dropFirst(10).first == "A" ? "B" : "A") + token.dropFirst(11)
+            result(ProToken.isGood(token, key: key, machine: machine, serverKey: publicKey)
+                   && !ProToken.isGood(token, key: key, machine: otherMachine, serverKey: publicKey)
+                   && !ProToken.isGood(token, key: otherKey, machine: machine, serverKey: publicKey)
+                   && !ProToken.isGood(token, key: key, machine: machine, serverKey: other)
+                   && !ProToken.isGood(changed, key: key, machine: machine, serverKey: publicKey),
+                   "the test token works only for its key, its Mac and the test public key")
+            continue
+        }
         guard parts.count == 3 else { continue }
         let key = parts[2], serial = parts[1]
         switch parts[0] {
+        case "once":
+            // Only the typo check is the app's: every one-character change is caught; nothing works without the server.
+            onceKeys += 1
+            result(ProKey.kind(key) == .once && ProKey.raw(key).hasPrefix(serial) && !Pro.shared.works(key), "key \(serial) isn't read as a key")
+            result(!changes(key).contains { ProKey.kind($0) == .once }, "a one-character change of key \(serial) has no typo")
         case "signed":
             let check = ProKeyCheck(publicKey: publicKey, oldKeys: [])
             result(check.publicKey != nil && ProKey.signedParts(key)?.serial == serial && check.works(key)
@@ -565,6 +589,7 @@ if let path = arg("--pro-test") {
         default: continue
         }
     }
+    result(onceKeys > 0, "no once lines")
     print("pro-test: \(good) of \(good + bad) checks pass")
     exit(bad == 0 && good > 0 ? 0 : 1)
 }

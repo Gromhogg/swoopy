@@ -1,7 +1,12 @@
 // Swoopy Pro keys, for the owner: the program behind tools/pro-keys.sh (see there for how to use it).
 // Runs with the Swift that comes with the Mac's Command Line Tools; nothing else to install.
 //
-// Signed keys (since 2026-10-19): 115 characters from 23456789ABCDEFGHJKMNPQRSTUVWXYZ (no 0, 1, I, L or O), shown in
+// Keys (since 2026-11-03; each unlocks one Mac): 20 characters from the same 31, a 4-character serial number, 12
+// characters from HMAC-SHA-256 of "SWOOPY-ONCE:" + serial with server-secret.txt (the key server has the same secret),
+// and the same 4-character typo check. The app sends a key to the server (server/), which lets the first Mac have it
+// and refuses every other Mac. Must match server/src/key.js and Sources/Pro.swift.
+//
+// Signed keys (2026-10-19 to 2026-11-03, still accepted with no server): 115 characters from 23456789ABCDEFGHJKMNPQRSTUVWXYZ (no 0, 1, I, L or O), shown in
 // groups of 5: "P2" (which kind of key), a 5-character serial number, 104 characters holding an Ed25519 signature of
 // "PSPRO3:P2" + serial made with the owner's private signing key, and a 4-character typo check (SHA-256 of
 // "PSPRO1:" + the first 111 characters). The app holds only the public half, which can check keys but not make them.
@@ -16,6 +21,9 @@ import Foundation
 let alphabet = Array("23456789ABCDEFGHJKMNPQRSTUVWXYZ")
 let marker = "P2"
 let oldLength = 25, signedLength = 115, serialLength = 5, signatureLength = 104
+let onceLength = 20, onceSerialLength = 4, onceSecretLength = 12
+// The key server (server/; the same address as ProConfig.server in the app).
+let serverURL = ProcessInfo.processInfo.environment["SWOOPY_PRO_SERVER"] ?? "https://swoopy-pro.SUBDOMAIN.workers.dev"
 
 let folder = URL(fileURLWithPath: ProcessInfo.processInfo.environment["PITCH_SHIFT_KEYS_DIR"]
     ?? NSHomeDirectory() + "/Library/Application Support/Pitch Shift Keys")
@@ -23,6 +31,9 @@ let privateFile = folder.appendingPathComponent("signing-private.txt")
 let publicFile = folder.appendingPathComponent("signing-public.txt")
 let issuedFile = folder.appendingPathComponent("issued.txt")
 let oldSecretFile = folder.appendingPathComponent("secret.txt")
+let serverSecretFile = folder.appendingPathComponent("server-secret.txt")
+let serverPrivateFile = folder.appendingPathComponent("server-signing-private.txt")
+let serverPublicFile = folder.appendingPathComponent("server-signing-public.txt")
 
 func say(_ text: String) { FileHandle.standardError.write(Data((text + "\n").utf8)) }
 func stop(_ text: String) -> Never { say(text); exit(1) }
@@ -96,8 +107,8 @@ func unhex(_ text: String) -> Data? {
     return data
 }
 
-// A random serial number: 5 characters from the alphabet, each equally likely.
-func randomSerial() -> String { String((0..<serialLength).map { _ in alphabet[Int.random(in: 0..<alphabet.count)] }) }
+// A random serial number from the alphabet, each character equally likely.
+func randomSerial(_ length: Int = serialLength) -> String { String((0..<length).map { _ in alphabet[Int.random(in: 0..<alphabet.count)] }) }
 
 func signedMessage(_ serial: String) -> Data { Data(("PSPRO3:" + marker + serial).utf8) }
 
@@ -118,12 +129,26 @@ func oldKey(serial: String, secret: String) -> String {
     return body + checkPart(body)
 }
 
-enum Kind { case old, signed }
+// A key's secret part: each of the 12 characters from two bytes of HMAC-SHA-256("SWOOPY-ONCE:" + serial) with the
+// server secret, modulo 31.
+func onceSecretPart(serial: String, secret: String) -> String {
+    let code = Array(HMAC<SHA256>.authenticationCode(for: Data(("SWOOPY-ONCE:" + serial).utf8), using: SymmetricKey(data: Data(secret.utf8))))
+    return String((0..<onceSecretLength).map { alphabet[Int((UInt16(code[2 * $0]) << 8 | UInt16(code[2 * $0 + 1])) % 31)] })
+}
+func onceKey(serial: String, secret: String) -> String {
+    let body = serial + onceSecretPart(serial: serial, secret: secret)
+    return body + checkPart(body)
+}
+func onceWorks(_ raw: String, secret: String) -> Bool {
+    kind(raw) == .once && String(raw.dropFirst(onceSerialLength).prefix(onceSecretLength)) == onceSecretPart(serial: String(raw.prefix(onceSerialLength)), secret: secret)
+}
+
+enum Kind { case once, old, signed }
 // The kind of key as typed, or nil if it has a typo (or isn't a whole key).
 func kind(_ raw: String) -> Kind? {
-    guard raw.allSatisfy(alphabet.contains), raw.count == oldLength || (raw.count == signedLength && raw.hasPrefix(marker)),
+    guard raw.allSatisfy(alphabet.contains), [onceLength, oldLength].contains(raw.count) || (raw.count == signedLength && raw.hasPrefix(marker)),
           checkPart(String(raw.dropLast(4))) == String(raw.suffix(4)) else { return nil }
-    return raw.count == oldLength ? .old : .signed
+    return raw.count == onceLength ? .once : raw.count == oldLength ? .old : .signed
 }
 func signedWorks(_ raw: String, publicKey: Curve25519.Signing.PublicKey) -> Bool {
     guard kind(raw) == .signed else { return false }
@@ -136,6 +161,7 @@ func oldWorks(_ raw: String, secret: String) -> Bool {
 }
 // The serial number of a key as written in issued.txt.
 func serialOf(_ raw: String) -> String? {
+    if raw.count == onceLength { return String(raw.prefix(onceSerialLength)) }
     if raw.count == oldLength { return String(raw.prefix(serialLength)) }
     if raw.count == signedLength { return String(raw.dropFirst(marker.count).prefix(serialLength)) }
     return nil
@@ -153,6 +179,33 @@ func issued() -> [(line: String, raw: String)] {
     (readText(issuedFile) ?? "").split(whereSeparator: \.isNewline).compactMap { line in
         line.split(separator: " ").last.map { (String(line), raw(String($0))) }
     }
+}
+
+func readSecret(_ url: URL) -> String? { readText(url).map { $0.filter { !$0.isWhitespace } }.flatMap { $0.isEmpty ? nil : $0 } }
+
+enum ServerAnswer { case used(Bool), problem(String) }
+
+// Asks the key server whether a key was used: true or false, or why it couldn't tell ("wrong-key": the server has a
+// different secret; anything else: no answer).
+func askServer(_ raw: String) -> ServerAnswer {
+    guard let url = URL(string: serverURL + "/check") else { return .problem("no server address") }
+    var request = URLRequest(url: url, timeoutInterval: 20)
+    request.httpMethod = "POST"
+    request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+    request.httpBody = try? JSONSerialization.data(withJSONObject: ["key": raw])
+    var result: ServerAnswer = .problem("no answer from \(serverURL)")
+    let done = DispatchSemaphore(value: 0)
+    URLSession.shared.dataTask(with: request) { data, _, error in
+        defer { done.signal() }
+        guard let data, let reply = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            result = .problem(error?.localizedDescription ?? "no answer from \(serverURL)")
+            return
+        }
+        if reply["ok"] as? Bool == true, let used = reply["used"] as? Bool { result = .used(used) }
+        else { result = .problem(reply["error"] as? String ?? "an answer it didn't understand") }
+    }.resume()
+    done.wait()
+    return result
 }
 
 // Writes a file only this Mac user can read.
@@ -197,22 +250,53 @@ case "setup":
     print("Made a key pair in \(folder.path): signing-private.txt (makes keys: never share it, never put it in git) and signing-public.txt (goes into the app).")
     print("Back up the whole Pitch Shift Keys folder now (for example on a USB stick): without signing-private.txt no more keys can be made for this app.")
 
+case "server-setup":
+    // Makes the key server's secret (makes and checks keys) and its token key pair, once. Never replaces them: keys
+    // already sent out would stop working.
+    let manager = FileManager.default
+    if [serverSecretFile, serverPrivateFile, serverPublicFile].contains(where: { manager.fileExists(atPath: $0.path) }) {
+        print("The server's secrets are already in \(folder.path); nothing was changed.")
+        exit(0)
+    }
+    try? manager.createDirectory(at: folder, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+    try? manager.setAttributes([.posixPermissions: 0o700], ofItemAtPath: folder.path)
+    var bytes = [UInt8](repeating: 0, count: 32)
+    guard SecRandomCopyBytes(kSecRandomDefault, bytes.count, &bytes) == errSecSuccess else { stop("Couldn't make a random secret") }
+    let tokenKey = Curve25519.Signing.PrivateKey()
+    writePrivate(hex(Data(bytes)) + "\n", to: serverSecretFile)
+    writePrivate(hex(tokenKey.rawRepresentation) + "\n", to: serverPrivateFile)
+    writePrivate(hex(tokenKey.publicKey.rawRepresentation) + "\n", to: serverPublicFile)
+    print("Made server-secret.txt and server-signing-private.txt (both go to the server only, with wrangler secret put) and server-signing-public.txt (goes into the app: ProConfig.serverKey) in \(folder.path).")
+    print("Back up the whole Pitch Shift Keys folder again.")
+
 case "new":
     let name = arguments.dropFirst().joined(separator: " ").trimmingCharacters(in: .whitespacesAndNewlines)
     guard !name.isEmpty else { stop("Use: tools/pro-keys.sh new \"their name or email\"") }
-    guard let signer = loadPrivate() else {
-        stop("No key pair in \(folder.path) yet. Run tools/pro-keys.sh setup first (or copy your backup of the Pitch Shift Keys folder back).")
+    guard let secret = readSecret(serverSecretFile) else {
+        stop("No server-secret.txt in \(folder.path). Copy your backup of the Pitch Shift Keys folder back.")
     }
-    let taken = Set(issued().compactMap { serialOf($0.raw) })
-    var serial = randomSerial()
-    while taken.contains(serial) { serial = randomSerial() }  // never the same serial twice
-    let key = signedKey(serial: serial, signer: signer)
-    guard signedWorks(key, publicKey: signer.publicKey) else { stop("The new key didn't check out; nothing was saved.") }
+    var taken = Set(issued().compactMap { serialOf($0.raw) })
+    var key = "", note = ""
+    while key.isEmpty {
+        var serial = randomSerial(onceSerialLength)
+        while taken.contains(serial) { serial = randomSerial(onceSerialLength) }  // never the same serial twice
+        let made = onceKey(serial: serial, secret: secret)
+        guard onceWorks(made, secret: secret) else { stop("The new key didn't check out; nothing was saved.") }
+        // The server should know this key and say it was never used.
+        switch askServer(made) {
+        case .used(false): key = made
+        case .used(true): taken.insert(serial)  // used already (a key missing from issued.txt): make another
+        case .problem("wrong-key"): stop("The key server doesn't accept keys made with this Mac's server-secret.txt (it has a different secret). Nothing was saved.")
+        case .problem(let reason):
+            key = made
+            note = " Couldn't ask the key server to double-check it (\(reason)), but the key is good."
+        }
+    }
     let date = { () -> String in let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd HH:mm"; return f.string(from: Date()) }()
     writePrivate("\(date)  \(name.replacingOccurrences(of: "\n", with: " "))  \(grouped(key))\n", to: issuedFile,
                  append: FileManager.default.fileExists(atPath: issuedFile.path))
-    print(inLines(key))
-    say("Added to \(issuedFile.path). Paste the whole key (all \(inLines(key).split(separator: "\n").count) lines) into your email.")
+    print(grouped(key))
+    say("Added to \(issuedFile.path). It unlocks one Mac (needs Swoopy 3.6 or newer).\(note)")
 
 case "list":
     let text = readText(issuedFile) ?? ""
@@ -224,8 +308,19 @@ case "check":
     let listed = issued().first { $0.raw == typed }.map { " Made: \($0.line)" } ?? ""
     switch kind(typed) {
     case nil:
-        print("That key has a typo (or isn't a whole key: signed keys are \(signedLength) characters, older ones \(oldLength)).")
+        print("That key has a typo (or isn't a whole key: keys are \(onceLength) characters, older ones \(oldLength) or \(signedLength)).")
         exit(1)
+    case .once:
+        guard let secret = readSecret(serverSecretFile) else { stop("No server-secret.txt in \(folder.path), so this key can't be checked.") }
+        guard onceWorks(typed, secret: secret) else {
+            print("That key doesn't work: it wasn't made with this Mac's server-secret.txt.")
+            exit(1)
+        }
+        switch askServer(typed) {
+        case .used(false): print("That key works and hasn't been used yet.\(listed)")
+        case .used(true): print("That key works, but it was already used: it unlocks only the Mac that used it.\(listed)")
+        case .problem(let reason): print("That key is good (couldn't ask the key server whether it was used: \(reason)).\(listed)")
+        }
     case .signed:
         guard let publicKey = loadPublic() else { stop("No key pair in \(folder.path), so no signed key can be checked.") }
         if signedWorks(typed, publicKey: publicKey) {
@@ -254,7 +349,7 @@ case "test":
     // test key pair (whose private half is in the file on purpose: it unlocks nothing in a real build).
     let path = arguments.count > 1 ? arguments[1] : URL(fileURLWithPath: CommandLine.arguments[0]).deletingLastPathComponent().appendingPathComponent("pro-keys-test.txt").path
     guard let text = try? String(contentsOfFile: path, encoding: .utf8) else { stop("Can't read \(path)") }
-    var secret = "", publicKey: Curve25519.Signing.PublicKey?, signer: Curve25519.Signing.PrivateKey?
+    var secret = "", onceSecret = "", publicKey: Curve25519.Signing.PublicKey?, signer: Curve25519.Signing.PrivateKey?
     var good = 0, bad = 0
     func result(_ ok: Bool, _ what: String) { if ok { good += 1 } else { bad += 1; print("different: \(what)") } }
     for line in text.split(whereSeparator: \.isNewline) where !line.hasPrefix("#") {
@@ -262,6 +357,11 @@ case "test":
         guard parts.count >= 2 else { continue }
         switch parts[0] {
         case "secret": secret = parts[1]
+        case "once-secret": onceSecret = parts[1]
+        case "once" where parts.count == 3:
+            let made = grouped(onceKey(serial: parts[1], secret: onceSecret))
+            result(made == parts[2] && onceWorks(raw(parts[2]), secret: onceSecret) && !onceWorks(raw(parts[2]), secret: onceSecret + "x"),
+                   "key \(parts[1]) made \(made), the file says \(parts[2])")
         case "public": publicKey = unhex(parts[1]).flatMap { try? Curve25519.Signing.PublicKey(rawRepresentation: $0) }
         case "private": signer = unhex(parts[1]).flatMap { try? Curve25519.Signing.PrivateKey(rawRepresentation: $0) }
         case "old" where parts.count == 3:
@@ -295,10 +395,11 @@ case "test":
 
 case "help", "-h", "--help", "":
     print("""
-    tools/pro-keys.sh setup                        makes your key pair, once (never replaces one that's there)
-    tools/pro-keys.sh new "their name or email"   makes a key, prints it, and adds it to the list
+    tools/pro-keys.sh new "their name or email"   makes a key (it unlocks one Mac), prints it, adds it to the list
     tools/pro-keys.sh list                         every key made so far (date, name, key)
-    tools/pro-keys.sh check KEY                    says whether a key works, and who it was made for
+    tools/pro-keys.sh check KEY                    says whether a key works, whether it was used, and who it was for
+    tools/pro-keys.sh server-setup                 makes the key server's secrets, once (done 2026-11-03)
+    tools/pro-keys.sh setup                        makes the older signed keys' key pair, once (done 2026-10-19)
     """)
 default:
     stop("Unknown: \(arguments[0]) (try tools/pro-keys.sh help)")

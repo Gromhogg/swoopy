@@ -2847,8 +2847,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
     // For screenshots (--preview hear-on,voice-on,waiting,typing,recording,playing,listening,hover,menu,roll,
     // resize,no-driver,advanced-alert,sounds,rename,volume,drop,light,tone,slow,eq,changer,changer-man,
     // changer-realistic,changer-loading,changer-fallback,changer-slider-natural|fast|default|max|NN,changer-intel,
-    // changer-second-off,changer-quiet-on,changer-card-off,pro-locked,pro-unlock,pro-typo,pro-paste,pro-done,pro-alone,
-    // pro-unlocked,switch-flip,click-voice,click-vc [--size 800x400] [--steps 3,-2]): shows a state, no sound. With a
+    // changer-second-off,changer-quiet-on,changer-card-off,pro-locked,pro-unlock,pro-typo,pro-paste,pro-done,
+    // pro-checking,pro-used,pro-alone,pro-unlocked,switch-flip,click-voice,click-vc [--size 800x400] [--steps 3,-2]): shows a state, no sound. With a
     // changer state, Your voice shows off (only one at a time).
     func showPreview() {
         guard let preview else { return }
@@ -2883,13 +2883,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         if preview.contains("click-voice") { DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { self.voiceCard.onToggle(true) } }
         if preview.contains("click-vc") { DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { self.changerCard.onToggle(true) } }
         // The unlock window (with pro-typo: a key with a typo; pro-paste: a key pasted from an email, line breaks and
-        // all; pro-done: unlocked; pro-alone: as its own window).
+        // all; pro-done: unlocked; pro-checking: the key being checked; pro-used: a key used on another Mac;
+        // pro-alone: as its own window).
         if previewStates.contains("pro-unlock") {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                 ProSheet.shared.show(on: self.window, alone: previewStates.contains("pro-alone"))
                 if previewStates.contains("pro-typo") { ProSheet.shared.showTypo() }
                 if previewStates.contains("pro-paste") { ProSheet.shared.showPasted() }
                 if previewStates.contains("pro-done") { ProSheet.shared.showUnlockedMessage() }
+                if previewStates.contains("pro-checking") { ProSheet.shared.showChecking(used: false) }
+                if previewStates.contains("pro-used") { ProSheet.shared.showChecking(used: true) }
             }
         }
         if preview.contains("typing") {
