@@ -1215,7 +1215,7 @@ final class ShiftCard: NSView {
     private var active: Bool?
     private var numberActive: Bool?
     private var accessoryScale: ((CGFloat) -> Void)?  // sizes the views next to the picker (addPickerAccessory)
-    var keepsLook: [NSView] = []  // rows that look the same while the card is off (they don't belong to its switch)
+    var keepsLook: [NSView] = []  // rows, or views in a row, that look the same while the card is off (they don't belong to its switch)
 
     // The title, with a small lock after it while Pitch Shift Pro is locked.
     private func showTitle() {
@@ -1461,7 +1461,12 @@ final class ShiftCard: NSView {
         // A card with the number that's off: everything in it still works, a little fainter (like the number).
         guard showsAmount else { return }
         let soft = active ? 1 : Self.offStrength
-        for view in [buttons, picker] + rows where !keepsLook.contains(view) {
+        let fading = ([buttons, picker] + rows).flatMap { view -> [NSView] in
+            if keepsLook.contains(view) { return [] }
+            guard let row = view as? NSStackView, row.arrangedSubviews.contains(where: { keepsLook.contains($0) }) else { return [view] }
+            return row.arrangedSubviews.filter { !keepsLook.contains($0) }
+        }
+        for view in fading {
             if isShowing { Theme.animate(0.25) { view.animator().alphaValue = soft } } else { view.alphaValue = soft }
         }
     }
@@ -1953,7 +1958,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         voiceCard = ShiftCard(title: "Input pitch shifter", extraRows: [styleRow, slowRow])
         voiceCard.addRow(fastRow, tight: true)
         voiceCard.addRow(footer)
-        voiceCard.keepsLook = [footer]  // Pitch Shift Mic and the Soundboard work whether the voice is on or off
+        voiceCard.keepsLook = [footer, testButton]  // Pitch Shift Mic, the Soundboard and Test work whether the voice is on or off
         voiceCard.picker.menu?.delegate = self
         voiceCard.picker.target = self
         voiceCard.picker.action = #selector(micPicked)
@@ -2561,6 +2566,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
 
     @objc func testClicked() {
         guard preview == nil else { return }  // pictures: see setHear
+        if test.phase == .idle && !driverInstalled { installDriver(); return }
+        if test.phase == .idle && Mics.list().isEmpty { NSSound.beep(); return }
         // With Input pitch shifter off, the voice runs with the card's settings just for the test: the switch stays
         // off, the Mac's default mic is left as it is, and the voice stops again once the test is done. (With the Voice
         // changer on, it's the changer's voice that is recorded, and the changer keeps going afterwards.)
@@ -3050,7 +3057,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
             testButton.title = "Test"
             testButton.bezelColor = Theme.purple
             testButton.setAccessibilityLabel("Test")
-            testButton.isEnabled = installed && hasMic
+            testButton.isEnabled = true
         case .recording(let left):
             testButton.title = "● \(left)"
             testButton.bezelColor = .systemRed
