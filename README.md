@@ -65,6 +65,14 @@ More help: [windows/README.md](windows/README.md).
 - The Soundboard works with **Input pitch shifter** off too: your mic then goes into the call unchanged (or through the voice changer, if it's on).
 - Use headphones in calls. If your voice cuts out, turn off the call app's noise suppression (like Krisp).
 
+**Hotkeys** (Mac)
+
+- Choose **Hotkeys…** in the **Pitch Shift** menu to set keys for **Input pitch shifter** on/off, **Voice changer** on/off and **Push to talk**. They work while another app is in front.
+- Right-click a sound and choose **Set Key…** to play it with a key, even with the Soundboard closed. Press the key again to stop it.
+- A key needs ⌘ or ⌃, or it can be an F-key on its own. Other apps can't use a key while it's set here.
+- **Push to talk:** setting a key turns it on. Your mic is then silent unless you hold the key down. Sounds still play. Clear the key to turn it off.
+- Hotkeys are free, except the **Voice changer** key and the sounds' keys, which need Pro like the Voice changer and the Soundboard.
+
 **Voice changer** (Mac)
 
 - Turn it on and pick **Woman** (for a man's voice) or **Man** (for a woman's voice). It works on its own: **Input pitch shifter** doesn't need to be on. Choose **Pitch Shift Mic** in your call app, as for **Input pitch shifter**.

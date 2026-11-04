@@ -1548,6 +1548,8 @@ enum Keys {
     static let changerSounds = "changerSounds"
     // 3.5: "Block background sounds" (not set: off)
     static let changerQuiet = "changerQuiet"
+    // Hotkeys: ["voice" / "changer" / "talk": HotKey.saved], only the ones set. Sounds keep theirs in the Soundboard's list.
+    static let hotkeys = "hotkeys"
 }
 
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWindowDelegate {
@@ -1570,6 +1572,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
     lazy var board = Soundboard(voice: voice, sounds: preview == nil ? Soundboard.saved(defaults) : Soundboard.examples,
                                 saves: preview == nil)
     lazy var soundboard = SoundboardPanel(board: board)
+    // Pictures take no key from the Mac and change nothing.
+    lazy var hotkeys = Hotkeys(voice: voice, board: board, defaults: defaults, saves: preview == nil,
+                               system: preview == nil ? SystemKeys() : PretendKeys())
+    lazy var hotkeysPanel = HotkeysPanel(hotkeys: hotkeys)
 
     // The saved voice style. Version 2.0 had a Natural/Cartoon switch instead: the first launch of this version turns
     // it into the slider's setting (Natural 0, Cartoon 1) and removes it; from then on only voiceCartoon is used.
@@ -1753,15 +1759,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         Pro.shared.onChange = { [weak self] in self?.proChanged() }
         hear.onChange = { [weak self] in self?.refresh() }
         voice.onChange = { [weak self] in self?.refresh() }
+        voice.onListenerGone = { [weak self] in
+            DefaultMic.giveBack()
+            self?.refresh()
+        }
         test.onChange = { [weak self] in self?.endTestAlone(); self?.refresh() }
-        board.onChange = { [weak self] in self?.soundboard.update() }
+        board.onChange = { [weak self] in
+            self?.soundboard.update()
+            self?.soundKeyDone()
+        }
         soundboard.onClose = { [weak self] in self?.soundboardClosed() }
+        soundboard.onSetKey = { [weak self] file in self?.hotkeysPanel.open(sound: file) }
+        hotkeys.unlocked = { Pro.shared.unlocked }
+        hotkeys.onPress = { [weak self] action in self?.hotkeyPressed(action) }
         deviceListeners = [kAudioHardwarePropertyDevices, kAudioHardwarePropertyDefaultInputDevice, kAudioHardwarePropertyDefaultOutputDevice].map {
             Listener(system, $0) { [weak self] in self?.deviceDebounce.call { self?.refresh() } }
         }
         refresh()
         showWindow()
         if preview != nil { showPreview(); return }
+        useHotkeys()
         // Show the window first: the first time, macOS asks for permission to grab sound and waits for an answer.
         DispatchQueue.main.async { [self] in
             if defaults.object(forKey: Keys.hearOn) as? Bool ?? true { hear.start() }
@@ -1827,6 +1844,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
                ("-", #selector(showUnlock), "", [])]
             : []
         submenu("Pitch Shift", pro + [
+            ("Hotkeys…", #selector(showHotkeys), "", []),
+            ("-", #selector(showHotkeys), "", []),
             ("Hide Pitch Shift", #selector(NSApplication.hide(_:)), "h", .command),
             ("-", #selector(NSApplication.hide(_:)), "", []),
             ("Quit Pitch Shift", #selector(NSApplication.terminate(_:)), "q", .command),
@@ -2138,11 +2157,81 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
             voice.stopChanger()
             if preview == nil && !voice.running { DefaultMic.giveBack() }
             if soundboard.isOpen { soundboard.close() }
+            board.stop()
         }
         buildMenu()
         showUnlockButton()
         styleSounds()
         refresh()
+        if preview == nil { useHotkeys() }
+        hotkeysPanel.update()  // the Voice changer's and the sounds' keys are Pro
+    }
+
+    // MARK: Hotkeys
+
+    @objc func showHotkeys() {
+        hotkeysPanel.open()
+    }
+
+    // Takes the saved keys (the Voice changer's and the sounds' only while Pitch Shift Pro is unlocked). A key another
+    // app has stays off, and says so.
+    private func useHotkeys() {
+        let taken = hotkeys.refresh().compactMap { hotkeys.key(for: $0)?.name }
+        guard !taken.isEmpty else { return }
+        let alert = NSAlert()
+        alert.messageText = "Another app is using \(taken.joined(separator: ", "))"
+        alert.informativeText = "That hotkey is off. To use another key, choose Hotkeys… in the Pitch Shift menu."
+        alert.beginSheetModal(for: window)
+    }
+
+    // The same as the switches on the cards and the Sounds button, which don't work without these.
+    private func hotkeyPressed(_ action: Hotkeys.Action) {
+        guard driverInstalled, !Mics.list().isEmpty else { NSSound.beep(); return }
+        switch action {
+        case .voice: setVoice(!(voice.isOn && !testAlone))
+        case .changer: setChanger(!voice.changer.on)
+        case .sound(let file): soundKey(file)
+        case .talk: break
+        }
+    }
+
+    private var soundKeyRan = false    // a sound's key started the voice chain, with no Soundboard
+    private var waitingSound: String?  // the sound that plays once an app has moved to Pitch Shift Mic
+
+    // A sound's key plays it or stops it. With nothing running the chain starts as when the Soundboard opens, with no
+    // window, and when the sound is over it's as if the Soundboard closed: the chain stays on while an app listens.
+    private func soundKey(_ file: String) {
+        guard waitingSound == nil else { waitingSound = file; return }
+        guard !voice.running else { board.click(file); return }
+        let appMoves = isRunningSomewhere(defaultInput())
+        soundsOff?.cancel()
+        soundsOff = nil
+        soundKeyRan = true
+        voice.keepForSounds(true)
+        DefaultMic.takeOver()
+        refresh()
+        waitingSound = file
+        playWaitingSound(tries: appMoves && voice.chain == nil ? 20 : 0)
+    }
+
+    // An app using the Mac's default mic moves to Pitch Shift Mic now, and a chain that starts late doesn't send a sound
+    // already playing. Waits for that, up to a second.
+    private func playWaitingSound(tries: Int) {
+        guard voice.chain == nil && tries > 0 else {
+            if let file = waitingSound {
+                waitingSound = nil
+                board.click(file)
+            }
+            soundKeyDone()
+            return
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in self?.playWaitingSound(tries: tries - 1) }
+    }
+
+    private func soundKeyDone() {
+        guard soundKeyRan, waitingSound == nil, board.playing == nil, !soundboard.isOpen else { return }
+        soundKeyRan = false
+        soundboardClosed()
     }
 
     // MARK: Layout
@@ -2590,7 +2679,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
     private func endTestAlone() {
         guard testAlone, test.phase == .idle else { return }
         testAlone = false
-        voice.stop()
+        voice.stop(soundsClosed: testSounds && !voice.runsForSounds)
         // The Soundboard opened or closed during the test (it leaves the default mic alone while the voice runs):
         // Pitch Shift Mic is the default mic only while something still runs.
         if testSounds && !voice.runsForSounds && voice.state == .off { DefaultMic.giveBack() }
@@ -2606,6 +2695,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         }
         soundboard.open(beside: window)
         guard preview == nil else { return }  // pictures change nothing
+        soundKeyRan = false
         // Sounds go out through the voice chain, so with Your voice and the Voice changer off it runs as if the voice
         // were on with no pitch change, and Pitch Shift Mic becomes the Mac's default mic (like turning the voice on).
         soundsOff?.cancel()
@@ -2618,7 +2708,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
     private var soundsOff: DispatchWorkItem?
 
     // The Soundboard closed: with Your voice and the Voice changer off, the chain stops and the real mic is given back
-    // a second later (like when an app stops listening; a sound that was just stopped fades out first).
+    // a second later (like when an app stops listening; a sound that was just stopped fades out first). If an app is
+    // still listening, that waits until it stops (voice.onListenerGone), so its mic doesn't change mid-call.
     func soundboardClosed() {
         guard preview == nil else { return }
         soundsOff?.cancel()
@@ -2828,13 +2919,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         // The Mac's sound system restarted; reconnect everything.
         DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [self] in
             let hearOn = hear.isOn, voiceOn = voice.isOn, changerOn = voice.changerIsOn, sounds = voice.runsForSounds
+            let forListener = voice.runsForListener
             hear.stop()
             voice.stopAll()
             if hearOn { hear.start() }
-            if voiceOn || changerOn || sounds {
+            if voiceOn || changerOn || sounds || forListener {
                 if voiceOn { voice.start() }
                 if changerOn { voice.startChanger() }
                 voice.keepForSounds(sounds)
+                if forListener { voice.keepForListener() }
                 DefaultMic.takeOver()
             }
             rebuildMicMenu()
@@ -2848,7 +2941,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
     // resize,no-driver,advanced-alert,sounds,rename,volume,drop,light,tone,slow,eq,changer,changer-man,
     // changer-realistic,changer-loading,changer-fallback,changer-slider-natural|fast|default|max|NN,changer-intel,
     // changer-second-off,changer-quiet-on,changer-card-off,pro-locked,pro-unlock,pro-typo,pro-paste,pro-done,pro-alone,
-    // pro-unlocked,switch-flip,click-voice,click-vc [--size 800x400] [--steps 3,-2]): shows a state, no sound. With a
+    // pro-unlocked,switch-flip,click-voice,click-vc,hotkeys,hotkeys-sound,hotkeys-catch,hotkeys-press,hotkeys-bad
+    // [--size 800x400] [--steps 3,-2]): shows a state, no sound. With a
     // changer state, Your voice shows off (only one at a time).
     func showPreview() {
         guard let preview else { return }
@@ -2922,6 +3016,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         if preview.contains("menu") {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { self.hearCard.picker.performClick(nil) }
         }
+        if preview.contains("hotkeys") { hotkeysPanel.showPicture(previewStates) }
         if preview.contains("advanced-alert") {  // the alert shown when Advanced processing is turned on
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                 self.advancedSwitch.isOn = true
@@ -3034,7 +3129,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         showChanger(active: changerActive, usable: installed && hasMic, locked: locked)
 
         let listening = preview.map { $0.contains("listening") } ?? voice.listening
-        dot.isLive = (voiceOn || voice.changer.on || voice.runsForSounds) && installed && listening
+        dot.isLive = (voiceOn || voice.changer.on || voice.runsForSounds || voice.runsForListener) && installed && listening
         footer.toolTip = dot.isLive ? "An app is using Pitch Shift Mic" : "Choose Pitch Shift Mic as the microphone in Discord, Zoom or any app"
         micName.setAccessibilityValue(dot.isLive ? "Pitch Shift Mic, in use" : "Pitch Shift Mic, not in use")
 

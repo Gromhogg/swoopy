@@ -139,31 +139,39 @@ private final class HearMix: @unchecked Sendable {
 }
 
 // One sound on the Soundboard: its file (a copy in the Sounds folder), the name on its button, which the owner
-// can change (the file keeps its name), and its own volume (1 = as loud as the others, up to 1.5).
+// can change (the file keeps its name), its own volume (1 = as loud as the others, up to 1.5), and its hotkey if any.
 struct SoundEntry: Equatable {
     static let loudest: Float = 1.5
     let file: String
     var name: String
     var volume: Float
+    var key: HotKey?
 
-    init(file: String, name: String? = nil, volume: Float = 1) {
+    init(file: String, name: String? = nil, volume: Float = 1, key: HotKey? = nil) {
         self.file = file
         self.name = name.flatMap { $0.isEmpty ? nil : $0 } ?? Soundboard.displayName(file)
         self.volume = volume.isFinite ? max(0, min(Self.loudest, volume)) : 1
+        self.key = key
     }
 
-    // One entry of the saved list: {file, name, volume}, or older forms: {file, name}, or just the file name.
+    // One entry of the saved list: {file, name, volume} and maybe {key}, or older forms: {file, name}, or just the
+    // file name.
     init?(saved: Any) {
         if let file = saved as? String {
             self.init(file: file)
         } else if let entry = saved as? [String: Any], let file = entry["file"] as? String, !file.isEmpty {
-            self.init(file: file, name: entry["name"] as? String, volume: (entry["volume"] as? NSNumber)?.floatValue ?? 1)
+            self.init(file: file, name: entry["name"] as? String, volume: (entry["volume"] as? NSNumber)?.floatValue ?? 1,
+                      key: HotKey(saved: entry["key"]))
         } else {
             return nil
         }
     }
 
-    var saved: [String: Any] { ["file": file, "name": name, "volume": Double(volume)] }
+    var saved: [String: Any] {
+        var entry: [String: Any] = ["file": file, "name": name, "volume": Double(volume)]
+        entry["key"] = key?.saved
+        return entry
+    }
 }
 
 // The list of sounds (copies of the owner's files, kept in Application Support), and playing them.
@@ -177,6 +185,7 @@ final class Soundboard {
     var files: [String] { sounds.map(\.file) }
     private(set) var playing: String?  // its file
     var onChange: () -> Void = {}
+    var onKeys: () -> Void = {}  // a sound's hotkey changed, or a sound with one was removed
     var speakers: Bool?        // tests: act as if the sound plays on the Mac's speakers (true) or headphones (false)
     var hearVolume: Float = 1  // the owner's own copy (tests: quiet, or 0 for none)
     var hearTap: AVAudioNodeTapBlock?  // tests: gets the owner's copy as it plays
@@ -214,7 +223,7 @@ final class Soundboard {
 
     // The saved list, without files that are gone. A list saved before sounds could be renamed (only file names) is
     // saved again in the new form the first time it's read.
-    static func saved(_ defaults: UserDefaults) -> [SoundEntry] {
+    static func saved(_ defaults: UserDefaults, folder: URL = Soundboard.folder) -> [SoundEntry] {
         let stored = defaults.array(forKey: key) ?? []
         let all = stored.compactMap(SoundEntry.init(saved:))
         if stored.contains(where: { $0 is String }) { defaults.set(all.map(\.saved), forKey: key) }
@@ -405,12 +414,14 @@ final class Soundboard {
     func remove(_ file: String) {
         if playing == file { stop() }
         if let clip = clips.removeValue(forKey: file) { keepAlive(clip) }
+        let hadKey = sounds.contains { $0.file == file && $0.key != nil }
         sounds.removeAll { $0.file == file }
         if saves {
             try? FileManager.default.removeItem(at: folder.appendingPathComponent(file))
             save()
         }
         onChange()
+        if hadKey { onKeys() }
     }
 
     // A new name for a sound's button (the file keeps its name). An empty name keeps the old one.
@@ -434,6 +445,13 @@ final class Soundboard {
 
     func volume(of file: String) -> Float { sounds.first { $0.file == file }?.volume ?? 1 }
 
+    func setKey(_ file: String, _ key: HotKey?) {
+        guard let i = sounds.firstIndex(where: { $0.file == file }) else { return }
+        sounds[i].key = key
+        save()
+        onKeys()
+    }
+
     private func save() {
         guard saves else { return }
         defaults.set(sounds.map(\.saved), forKey: Self.key)
@@ -454,13 +472,14 @@ final class Soundboard {
 // One sound's button: its name, filled with the theme colors while it plays. Click to play, again to stop. A small
 // ✕ shows in its corner while the mouse is over it (or right-click → Remove). Right-click → Rename… or a double-click
 // turns the name into a text field: Return keeps the new name, Escape the old one. Right-click → Volume… shows a
-// small slider for its own volume.
+// small slider for its own volume, and Set Key… asks for a hotkey.
 final class SoundPad: NSView, NSTextFieldDelegate {
     let file: String
     var onPlay: () -> Void = {}
     var onRemove: () -> Void = {}
     var onRename: (String) -> Void = { _ in }
     var onVolume: () -> Void = {}
+    var onSetKey: () -> Void = {}
     var isPlaying = false {
         didSet {
             guard oldValue != isPlaying else { return }
@@ -488,6 +507,7 @@ final class SoundPad: NSView, NSTextFieldDelegate {
         let menu = NSMenu()
         menu.addItem(withTitle: "Rename…", action: #selector(renameClicked), keyEquivalent: "").target = self
         menu.addItem(withTitle: "Volume…", action: #selector(volumeClicked), keyEquivalent: "").target = self
+        menu.addItem(withTitle: "Set Key…", action: #selector(setKeyClicked), keyEquivalent: "").target = self
         menu.addItem(withTitle: "Remove", action: #selector(removeClicked), keyEquivalent: "").target = self
         self.menu = menu
         setAccessibilityCustomActions([
@@ -497,6 +517,10 @@ final class SoundPad: NSView, NSTextFieldDelegate {
             },
             NSAccessibilityCustomAction(name: "Volume") { [weak self] in
                 self?.onVolume()
+                return true
+            },
+            NSAccessibilityCustomAction(name: "Set Key") { [weak self] in
+                self?.onSetKey()
                 return true
             },
             NSAccessibilityCustomAction(name: "Remove") { [weak self] in
@@ -660,6 +684,7 @@ final class SoundPad: NSView, NSTextFieldDelegate {
     @objc private func removeClicked() { onRemove() }
     @objc private func renameClicked() { startRenaming() }
     @objc private func volumeClicked() { onVolume() }
+    @objc private func setKeyClicked() { onSetKey() }
 }
 
 private final class FlippedView: NSView {
@@ -727,6 +752,7 @@ final class SoundboardPanel: NSObject, NSWindowDelegate, NSPopoverDelegate {
     private let stopButton = NSButton(title: "Stop", target: nil, action: nil)
     private var pads: [SoundPad] = []
     var onClose: () -> Void = {}
+    var onSetKey: (String) -> Void = { _ in }
     private var volumePopover: NSPopover?
     private var clickWatch: Any?  // closes the volume popover on a click in another app
     private let columns = 3, padSize = NSSize(width: 120, height: 40), gap: CGFloat = 8, margin: CGFloat = 16
@@ -828,6 +854,7 @@ final class SoundboardPanel: NSObject, NSWindowDelegate, NSPopoverDelegate {
             pad.onPlay = { [weak self] in self?.board.click(file) }
             pad.onRename = { [weak self] name in self?.board.rename(file, to: name) }
             pad.onVolume = { [weak self, weak pad] in if let pad { self?.showVolume(pad) } }
+            pad.onSetKey = { [weak self] in self?.onSetKey(file) }
             // A moment later: removing rebuilds the buttons, and this one is still handling its click.
             pad.onRemove = { [weak self] in DispatchQueue.main.async { self?.board.remove(file) } }
             return pad
