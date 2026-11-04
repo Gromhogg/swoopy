@@ -26,7 +26,7 @@ struct Settings {
     double downJumpMaxMs = 160, downHeldMinMs = 120, downHeldFadeMs = 40;
     double cutHz = 600;       // the lower sound's route carries what is below this
     bool split = true;        // the lower sound takes its own route
-    double limitLookMs = 10, limitReleaseMs = 300;  // the safety limiter
+    double limitLookMs = 20, limitReleaseMs = 1000;  // the safety limiter
     // A jump that missed its hit by less than this is left alone, and the next gap makes up the rest. Jumping again
     // for the same hit, often back the other way, makes two or three joins where one would do. Going up by more than
     // settleUpTo half-steps every hit is still put right, because there the drums need it.
