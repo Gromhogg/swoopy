@@ -25,7 +25,7 @@
 //     speaker is gone after ~0.1 s of voice) and learns from voiced frames and from smooth low ones (>= 0.5 x median,
 //     not rough), so a deep voice finds its real median; for the first 0.5 s of voice every smooth frame counts and
 //     only < 70 Hz is creak (the guess may be far off);
-//     3.6: the voice's guess is dropped once 25 learned frames have their own median more than 2 half-steps from it
+//     3.6: the voice's guess is dropped once 15 learned frames have their own median more than 2 half-steps from it
 //     (before, a deep man's 100 Hz against Woman's 120 Hz guess kept the guess for ~4 s of voice: the first 5-10 s of
 //     Woman came out 4-8 half-steps low); the speaker's first 0.5 s of voice is learned at once (not when each voiced
 //     stretch ends), and an earlier chain's median counts as a guess for those first rules (creak, half the median);
@@ -219,7 +219,7 @@ struct Tuning {
     // 3-7 half-steps off (a deep man's voice for Woman's 120 Hz, a high woman's for Man's 205 Hz) counted as 1 s of
     // voice and faded slowly, so the first 5-10 s came out 2-8 half-steps too low (Woman) or too high (Man).
     float seedOwnSt = 2;             // once seedOwnFrames frames are learned and their own median is more than this
-    float seedOwnFrames = 25;        // from the guess, the guess is dropped (and the AI's median finds it fast again)
+    float seedOwnFrames = 15;        // from the guess, the guess is dropped (and the AI's median finds it fast again)
     float earlyLearn = 1;            // until the median is known (warmFrames), frames are learned at once, not when
                                      // their voiced stretch is over
     float farHighSt = 8;             // once the median is known, frames more than this above it don't teach it (the
