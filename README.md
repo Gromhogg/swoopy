@@ -57,6 +57,7 @@ More help: [windows/README.md](windows/README.md).
 - Set how much higher or lower with the big number or **−**, **0** and **+**, the same way.
 - Turn on **Deeper when slow** and your voice goes lower while you talk slowly, then back when you talk normally (Mac).
 - With it on, **Higher when fast** makes your voice go higher while you talk fast: the slider sets how much, from **Off** to **+8** half-steps (starts at +4).
+- Slide **Echo** and **Radio** from **Off** to **Full** to add an echo, or to sound like an old radio and then a walkie-talkie (Mac). They work on the voice changer too. Soundboard sounds stay clean.
 - In Discord, Zoom or any other app, choose **Pitch Shift Mic** as your microphone.
 - Press **Test** to record 5 seconds of your shifted voice and hear it back. With the AI voice changer on, Test waits for the AI voice's delay before it stops, so you hear all 5 seconds in the AI voice.
 - Everything on the card can be set while it's off too (Mac): it's used when you turn the card on. **Test** works while it's off as well: your voice is changed just for the test, and the card stays off.
@@ -81,7 +82,7 @@ More help: [windows/README.md](windows/README.md).
 
 **Pitch Shift Pro ($5, Mac)**
 
-- Free: **Output pitch shifter** with Advanced processing, and **Input pitch shifter** in the Cartoon style, with **Test**.
+- Free: **Output pitch shifter** with Advanced processing, and **Input pitch shifter** in the Cartoon style, with **Echo**, **Radio** and **Test**.
 - Pro adds the **Voice changer** (with your own voices), the **Natural ↔ Cartoon** and **Bass ↔ Treble** sliders, **Auto EQ**, **Deeper when slow** (with **Higher when fast**) and the **Soundboard**. They show a small lock until you unlock them.
 - To get a key, click **Unlock Pro** at the top right, then **Email for a key** (or email cbsweetland@gmail.com). Copy the whole key from the email you get back (it's long, 4 lines; spaces and line breaks don't matter), paste it in and click **Unlock**. It works on all your Macs, for good, with no internet needed. Keys sent out before (25 characters) keep working.
 

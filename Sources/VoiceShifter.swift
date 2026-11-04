@@ -87,6 +87,8 @@ struct VoiceParams: @unchecked Sendable {
     var silent: Bool        // during Test playback, so the replay isn't sent into a live call
     var changer: UnsafePointer<VoiceChangerVoice>? = nil  // the voice changer's voice (nil = off)
     var strength: Float = 1                               // the voice changer's strength, 0 ... 1
+    var echo: Float = 0                                   // Echo, 0 (off) ... 1 (full)
+    var radio: Float = 0                                  // Radio, 0 (off) ... 1 (full)
 }
 
 // The voice changer card's settings: on/off, which voice (VoiceLibrary id), how strong, and the "Faster ↔ More real"
@@ -930,6 +932,7 @@ final class VoiceChain {
     // Sound effects (Soundboard): mixed in after the voice, never through the mic or the pitch change.
     private let sounds: OSAllocatedUnfairLock<SoundPlay>
     private var callMix: CallMix
+    private var effects: VoiceEffects  // Echo and Radio, on the voice before the sounds are mixed in
     // For the command-line test: replaces the mic with a made-up sound.
     var testSource: ((UnsafeMutablePointer<Float>, Int) -> Void)?
     private(set) var firstInputTime: UInt64 = 0  // host time of the first mic sample (for the delay test)
@@ -982,6 +985,7 @@ final class VoiceChain {
         speaking = SpeakingRate(sampleRate: rate)
         self.sounds = sounds
         callMix = CallMix(rate: rate, take: sounds.withLock { $0.take })  // a sound already playing when the chain starts isn't sent
+        effects = VoiceEffects(rate: rate)
         piece = .allocate(capacity: maxPiece)
         ring = VoiceRing(rate: rate)
 
@@ -1143,10 +1147,12 @@ final class VoiceChain {
         } else if let ai {
             voicestream_pull(ai, nil, 0, source, Int32(frames))  // (not reached while a voice is on: it always shifts)
         }
+        // While Test plays back nothing is sent, so the effects let go and no replay is left in the echo.
+        let silent = applied.silent
+        let effected = effects.process(source, frames, echo: silent ? 0 : applied.echo, radio: silent ? 0 : applied.radio)
         // (the mixing works on a copy, put back after: a stored value changed once per callback, not once per sample)
         var mix = callMix
-        let silent = applied.silent
-        for i in 0..<frames { source[i] = mix.out(silent ? 0 : source[i], shifting: shifting) }
+        for i in 0..<frames { source[i] = mix.out(silent ? 0 : source[i], shifting: shifting || effected) }
         callMix = mix
         for b in micOutputStreams..<outs.count {
             guard let d = outs[b].mData?.assumingMemoryBound(to: Float.self) else { continue }
@@ -1288,6 +1294,7 @@ final class VoiceChain {
     private func cleanUp() {
         piece.deallocate()
         scratch.deallocate()
+        effects.free()
         if let ai { voicestream_delete(ai) }  // the sound has stopped, so nothing uses it any more
         ai = nil
         voicechanger_delete(changer)
@@ -1344,6 +1351,8 @@ final class VoiceShifter {
     var cartoon: Float { didSet { pushParams() } }  // voice style: 0 = Natural, 1 = Cartoon
     var slowDeeper: Bool { didSet { pushParams() } }  // "Deeper when slow"
     var fastHigher: Float { didSet { pushParams() } }  // "Higher when fast": 0 (off) ... 8 half-steps, used while slowDeeper is on
+    var echo: Float { didSet { pushParams() } }   // "Echo": 0 (off) ... 1 (full), on Your voice and the Voice changer
+    var radio: Float { didSet { pushParams() } }  // "Radio", the same
     // The voice changer card. Used while its switch is on (the command-line checks turn it on with "Your voice"),
     // never in the Soundboard-only pass-through.
     var changer = ChangerSettings() { didSet { if changer != oldValue { pushParams() } } }
@@ -1381,11 +1390,13 @@ final class VoiceShifter {
     // from it instead of the voice's guess (Realistic remakes the chain when the voice changes).
     private var lastSpeaker: (hz: Float, frames: Float)?
 
-    init(halfSteps: Float, cartoon: Float, slowDeeper: Bool = false, fastHigher: Float = 0, micUID: String?) {
+    init(halfSteps: Float, cartoon: Float, slowDeeper: Bool = false, fastHigher: Float = 0, echo: Float = 0, radio: Float = 0, micUID: String?) {
         self.halfSteps = halfSteps
         self.cartoon = cartoon
         self.slowDeeper = slowDeeper
         self.fastHigher = fastHigher
+        self.echo = echo
+        self.radio = radio
         self.micUID = micUID
         params = OSAllocatedUnfairLock(initialState: VoiceParams(halfSteps: halfSteps, cartoon: cartoon, slowDeeper: slowDeeper,
                                                                  fastHigher: slowDeeper ? Self.cleanFastHigher(fastHigher) : 0, silent: false))
@@ -1487,19 +1498,23 @@ final class VoiceShifter {
         return ms / 1000
     }
 
-    // With Your voice and the Voice changer off (only the Soundboard running) the voice goes through unchanged.
+    // With Your voice and the Voice changer off (only the Soundboard running) the voice goes through unchanged, with
+    // no effects either.
     private func pushParams() {
         let voice = changerPlays ? VoiceLibrary.shared.voice(changer.voiceID)?.natural : nil
         // Only one at a time (the owner's rule): with a changer voice on, the changer alone sets the pitch, so the
         // amount and "Deeper when slow" are not sent (the window turns Your voice off when the changer goes on).
         let steps = voiceSwitch && voice == nil ? halfSteps : 0, cartoon = cartoon
         let slowDeeper = voiceSwitch && voice == nil && slowDeeper
+        let effects = voiceSwitch || changerPlays
         let new = VoiceParams(halfSteps: steps, cartoon: cartoon, slowDeeper: slowDeeper,
                               fastHigher: slowDeeper ? Self.cleanFastHigher(fastHigher) : 0, silent: false, changer: voice,
-                              strength: max(0, min(1, changer.strength)))
+                              strength: max(0, min(1, changer.strength)),
+                              echo: effects ? Self.cleanEffect(echo) : 0, radio: effects ? Self.cleanEffect(radio) : 0)
         params.withLock {
             $0.halfSteps = new.halfSteps; $0.cartoon = new.cartoon; $0.slowDeeper = new.slowDeeper
             $0.fastHigher = new.fastHigher; $0.changer = new.changer; $0.strength = new.strength
+            $0.echo = new.echo; $0.radio = new.radio
         }
         updateChangerState(voiceFound: voice != nil)
     }
@@ -1508,6 +1523,9 @@ final class VoiceShifter {
 
     // "Higher when fast" as the sound thread may use it: 0 ... SpeakingRate.maxUp half-steps.
     static func cleanFastHigher(_ value: Float) -> Float { value.isFinite ? max(0, min(SpeakingRate.maxUp, value)) : 0 }
+
+    // Echo or Radio as the sound thread may use it: 0 ... 1.
+    static func cleanEffect(_ value: Float) -> Float { value.isFinite ? max(0, min(1, value)) : 0 }
 
     // Natural mode plays whenever the changer is on. Realistic (AI): loading (Natural plays), realistic, fallback
     // (some pieces came late in the last 10 s; Natural filled in), or unavailable (why; Natural plays).
@@ -2035,7 +2053,7 @@ func changerStatsLine(_ s: VoiceChangerStats, seconds: Double) -> String {
 // Prints the Rubber Band + waiting-sound delay (the part of the mic-to-Pitch-Shift-Mic delay this code adds) and
 // the ring's dry-outs, trims and replays. No devices are used.
 func simulateVoiceChain(input: String, output: String, halfSteps: Float, cartoon: Float, slowDeeper: Bool, fastHigher: Float = 0,
-                        changer: ChangerOptions?, blockFrames: Int) throws {
+                        changer: ChangerOptions?, blockFrames: Int, echo: Float = 0, radio: Float = 0) throws {
     let file = try AVAudioFile(forReading: URL(fileURLWithPath: input))
     let rate = file.processingFormat.sampleRate
     let length = Int(file.length)
@@ -2058,6 +2076,8 @@ func simulateVoiceChain(input: String, output: String, halfSteps: Float, cartoon
         voicechanger_reset(voiceChanger)
     }
     let ring = VoiceRing(rate: rate)
+    var effects = VoiceEffects(rate: rate)
+    defer { effects.free() }
     let speaking = SpeakingRate(sampleRate: rate)
     speaking.up = VoiceShifter.cleanFastHigher(fastHigher)
     var block = [Float](repeating: 0, count: blockFrames)
@@ -2099,6 +2119,7 @@ func simulateVoiceChain(input: String, output: String, halfSteps: Float, cartoon
             block.withUnsafeMutableBufferPointer { voicechanger_post(voiceChanger, $0.baseAddress!, Int32(blockFrames), Int32(delay)) }
         }
         if !ring.waiting { delays.append(Double(delay) / rate * 1000) }
+        block.withUnsafeMutableBufferPointer { _ = effects.process($0.baseAddress!, blockFrames, echo: echo, radio: radio) }
         for i in 0..<blockFrames { result.append(softLimit(block[i])) }
     }
     let steady = Array(delays.suffix(delays.count * 4 / 5)).sorted()  // after the first fifth (start-up trims)

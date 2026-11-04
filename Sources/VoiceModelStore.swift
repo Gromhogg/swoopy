@@ -273,6 +273,12 @@ func readMonoFile(_ path: String) throws -> (samples: [Float], rate: Double) {
     guard let buffer = AVAudioPCMBuffer(pcmFormat: file.processingFormat, frameCapacity: AVAudioFrameCount(file.length)) else {
         throw Problem(message: "Could not read \(path).")
     }
-    try file.read(into: buffer)
-    return (Array(UnsafeBufferPointer(start: buffer.floatChannelData![0], count: Int(buffer.frameLength))), file.processingFormat.sampleRate)
+    var samples: [Float] = []
+    samples.reserveCapacity(Int(file.length))
+    while file.framePosition < file.length {  // one read can stop a few ms short of the end
+        try file.read(into: buffer)
+        guard buffer.frameLength > 0 else { break }
+        samples.append(contentsOf: UnsafeBufferPointer(start: buffer.floatChannelData![0], count: Int(buffer.frameLength)))
+    }
+    return (samples, file.processingFormat.sampleRate)
 }

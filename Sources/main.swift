@@ -41,6 +41,9 @@
 //                                              before 3.4; aiSecond=0: no second voice for laughs and hums;
 //                                              --block-background: "Block background sounds" on, the AI voice's
 //                                              main voice is its quiet version, here and in --test-voice/-button)
+//                [--echo 0.5] [--radio 0.5]    the Echo and Radio sliders, 0 ... 1, left out = 0 (with --voice too, also
+//                                              the AI voice; Echo adds 2 s at the end for its last repeats; also in
+//                                              --live-sim, --render-sounds, --test-voice, --test-button, --test-sounds)
 //                [--live-sim [--buffer 128]]   instead: the live chain's steps in callback-sized pieces (with the
 //                                              waiting sound), printing the delay they add (no devices)
 //   --list-voices [--voices-dir DIR]           the voice changer's voices (and files that were skipped)
@@ -88,9 +91,10 @@
 //                                              shifts a sound file with the app's own code (normal or advanced)
 //   --as-free (with any mode above)            as the free version plays it: Bass ↔ Treble in the middle, Auto EQ off,
 //                                              the voice style at Cartoon, Deeper when slow and Higher when fast off,
-//                                              no Voice changer; the options for those are ignored (one note says
-//                                              which), and --render-sounds, --test-sounds (the Soundboard) and
-//                                              --add-voice, --rename-voice, --remove-voice stop with a message.
+//                                              no Voice changer (Echo and Radio are free); the options for those are
+//                                              ignored (one note says which), and --render-sounds, --test-sounds (the
+//                                              Soundboard) and --add-voice, --rename-voice, --remove-voice stop with a
+//                                              message.
 //                                              A copy with Pitch Shift Pro locked always plays this way, like the
 //                                              window ("Pitch Shift Pro is locked: ... ignored (free version)").
 // Pitch Shift Pro (Sources/Pro.swift, notes/paid-unlock-plan.md):
@@ -119,7 +123,7 @@ func arg(_ name: String) -> String? {
     return args[i + 1]
 }
 // --preview STATES [--size 800x400] [--cartoon-amount 0.5] [--tone-amount -0.4] [--eq-offsets 3,-2,0,1,-1]
-// [--strength 0.6]: show the window in a state for screenshots, without touching any sound or settings, and without
+// [--strength 0.6] [--echo 0.5] [--radio 0.5]: show the window in a state for screenshots, without touching any sound or settings, and without
 // switching apps (states: hear-on, voice-on, waiting, typing, recording, playing, listening, hover, menu, roll, resize,
 // no-driver, advanced-alert, sounds, rename, volume, drop, light, tone, slow, eq, changer, changer-man,
 // changer-realistic, changer-loading, changer-fallback, changer-slider-natural|fast|default|max|NN, changer-intel,
@@ -292,6 +296,9 @@ let slowDeeperArg = asFree ? Free.slowDeeper : slowDeeperAsked && changerArg == 
 // "Higher when fast" with --slow-deeper: --fast-higher N half-steps (0 ... 8; left out = 0, off, as before).
 let fastHigherArg: Float = asFree ? Free.fastHigher
     : slowDeeperArg ? VoiceShifter.cleanFastHigher(arg("--fast-higher").flatMap(Float.init) ?? 0) : 0
+// Echo and Radio (free): --echo X, --radio X (0 ... 1; left out = 0, off). In --preview they set where the sliders are.
+let echoArg: Float = VoiceShifter.cleanEffect(arg("--echo").flatMap(Float.init) ?? 0)
+let radioArg: Float = VoiceShifter.cleanEffect(arg("--radio").flatMap(Float.init) ?? 0)
 // The amount for the voice: --steps (or `fallback`), except with --voice, where it is not used (the changer sets the
 // pitch; the fallback keeps the renders as they were).
 func voiceStepsArg(_ fallback: Float) -> Float { changerArg != nil ? fallback : arg("--steps").flatMap(Float.init) ?? fallback }
@@ -624,7 +631,7 @@ if let input = arg("--render-file") {
 if let input = arg("--render-voice") {
     let i = args.firstIndex(of: "--render-voice")!
     guard i + 2 < args.count else {
-        print("usage: --render-voice IN OUT [--steps N] [--cartoon-amount X] [--slow-deeper] [--voice-preset old] [--voice Woman [--strength S]]"); exit(1)
+        print("usage: --render-voice IN OUT [--steps N] [--cartoon-amount X] [--slow-deeper] [--voice-preset old] [--voice Woman [--strength S]] [--echo X] [--radio X]"); exit(1)
     }
     let preset = arg("--voice-preset") ?? "current"
     guard preset == "current" || preset == "old" else { print("--voice-preset: old or current"); exit(1) }
@@ -639,7 +646,7 @@ if let input = arg("--render-voice") {
         do {
             try simulateVoiceChain(input: input, output: args[i + 2], halfSteps: voiceStepsArg(3),
                                    cartoon: cartoonArg ?? 0, slowDeeper: slowDeeperArg, fastHigher: fastHigherArg, changer: changerArg,
-                                   blockFrames: arg("--buffer").flatMap(Int.init) ?? 128)
+                                   blockFrames: arg("--buffer").flatMap(Int.init) ?? 128, echo: echoArg, radio: radioArg)
             print("wrote \(args[i + 2])")
             exit(0)
         } catch {
@@ -661,6 +668,7 @@ if let input = arg("--render-voice") {
             try renderRealisticFile(input: input, natural: natural.samples, rate: natural.rate, output: args[i + 2], entry: entry,
                                     options: changerArg, lookaheadMs: lookaheadArg)
         }
+        if echoArg > 0 || radioArg > 0 { try addVoiceEffects(file: args[i + 2], echo: echoArg, radio: radioArg) }
         print("wrote \(args[i + 2])")
         exit(0)
     } catch {
@@ -692,7 +700,7 @@ if let input = arg("--render-sounds") {
     let volume = arg("--sound-volume").flatMap(Float.init).map { max(0, min(SoundEntry.loudest, $0)) } ?? 1
     let made = renderSounds(voice: voice, rate: rate, shifted: args.contains("--shifted"), clip: clip, starts: starts,
                             volume: volume, speakers: args.contains("--speakers"), buffer: arg("--buffer").flatMap(Int.init) ?? 128,
-                            old: preset == "old")
+                            old: preset == "old", echo: echoArg, radio: radioArg)
     guard let format = AVAudioFormat(standardFormatWithSampleRate: rate, channels: 1),
           let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(max(1, made.out.count))) else { exit(1) }
     buffer.frameLength = AVAudioFrameCount(made.out.count)
@@ -762,7 +770,8 @@ if args.contains("--test") {
 if args.contains("--test-voice") {
     let steps = voiceStepsArg(3)
     let micUID = arg("--mic").flatMap { name in Mics.list().first { $0.name == name }?.uid }
-    let voice = VoiceShifter(halfSteps: steps, cartoon: cartoonArg ?? 0, slowDeeper: slowDeeperArg, fastHigher: fastHigherArg, micUID: micUID)
+    let voice = VoiceShifter(halfSteps: steps, cartoon: cartoonArg ?? 0, slowDeeper: slowDeeperArg, fastHigher: fastHigherArg,
+                             echo: echoArg, radio: radioArg, micUID: micUID)
     if let changerArg, let entry = arg("--voice").flatMap({ VoiceLibrary.shared.voice($0) }) {  // --voice: the voice changer on
         voice.changerTune = changerArg.tune
         voice.changer = ChangerSettings(on: true, quiet: changerArg.quiet, voiceID: entry.id, strength: changerArg.strength, realism: realismArg)
@@ -973,7 +982,7 @@ if args.contains("--test-voice") {
 // tone.
 if args.contains("--test-button") {
     let micUID = arg("--mic").flatMap { name in Mics.list().first { $0.name == name }?.uid }  // e.g. not a Bluetooth headset's
-    let voice = VoiceShifter(halfSteps: voiceStepsArg(3), cartoon: asFree ? Free.cartoon : 0, micUID: micUID)
+    let voice = VoiceShifter(halfSteps: voiceStepsArg(3), cartoon: asFree ? Free.cartoon : 0, echo: echoArg, radio: radioArg, micUID: micUID)
     let rate = voice.currentMic.map(nominalRate) ?? 48000
     let volume = arg("--volume").flatMap(Double.init) ?? 0.03
     var speech = arg("--file").map { testVoiceFile($0, rate: rate) } ?? []
@@ -1039,7 +1048,7 @@ if let path = arg("--test-sounds") {
         exit(0)
     }
     let micUID = arg("--mic").flatMap { name in Mics.list().first { $0.name == name }?.uid }
-    let voice = VoiceShifter(halfSteps: steps, cartoon: 0, micUID: micUID)
+    let voice = VoiceShifter(halfSteps: steps, cartoon: 0, echo: echoArg, radio: radioArg, micUID: micUID)
     guard let mic = voice.currentMic, let virtualMic = Mics.virtualMic else { print("No mic or Pitch Shift Mic not installed"); exit(1) }
     let rate = nominalRate(mic)
     let volume = arg("--volume").flatMap(Double.init) ?? 0.05

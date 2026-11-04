@@ -971,8 +971,9 @@ final class SoundboardPanel: NSObject, NSWindowDelegate, NSPopoverDelegate {
 // next click comes first. The sound thread sees a click at the start of its next callback. Also times the mixing
 // part of each callback (nanoseconds; worst and average, with a sound playing and without). `old`: the mixing as in
 // 2.0.2 (no limiter, no fades at a sound's own ends; the clip should then be made with `levelFix: false` too).
+// `echo`, `radio`: the voice's effects, which go on before the sound is mixed in, as in the chain.
 func renderSounds(voice: [Float], rate: Double, shifted: Bool, clip: SoundClip, starts: [Double], volume: Float,
-                  speakers: Bool, buffer: Int, old: Bool = false) -> (out: [Float], timing: String) {
+                  speakers: Bool, buffer: Int, old: Bool = false, echo: Float = 0, radio: Float = 0) -> (out: [Float], timing: String) {
     var events: [(at: Int, play: SoundPlay)] = []
     let sorted = starts.sorted()
     for (n, start) in sorted.enumerated() {
@@ -983,6 +984,8 @@ func renderSounds(voice: [Float], rate: Double, shifted: Bool, clip: SoundClip, 
     }
     var state = SoundPlay()
     var callMix = CallMix(rate: rate, take: state.take, limits: !old, ends: !old)
+    var effects = VoiceEffects(rate: rate)
+    defer { effects.free() }
     var out = [Float](repeating: 0, count: voice.count)
     var block = [Float](repeating: 0, count: buffer)
     var next = 0
@@ -1002,7 +1005,8 @@ func renderSounds(voice: [Float], rate: Double, shifted: Bool, clip: SoundClip, 
         block.withUnsafeMutableBufferPointer { b in
             callMix.follow(state)
             callMix.muteIfNeeded(b.baseAddress!, frames)
-            for i in 0..<frames { b[i] = callMix.out(b[i], shifting: shifted) }
+            let effected = effects.process(b.baseAddress!, frames, echo: echo, radio: radio)
+            for i in 0..<frames { b[i] = callMix.out(b[i], shifting: shifted || effected) }
         }
         let took = DispatchTime.now().uptimeNanoseconds - started
         worst[playing] = max(worst[playing], took)
