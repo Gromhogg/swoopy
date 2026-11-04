@@ -80,7 +80,7 @@ main_checkout=${main_checkout:h}
 while read -r name size sum url; do
   [[ -z $name || $name == \#* ]] && continue
   zip=build/voices/$name
-  for dir in research/voicechanger/models{,/second} $main_checkout/research/voicechanger/models{,/second}; do
+  for dir in research/voicechanger/models $main_checkout/research/voicechanger/models; do
     [[ -f $zip ]] || [[ ! -f $dir/$name ]] || cp "$dir/$name" "$zip"
   done
   if [[ ! -f $zip ]] || ! echo "$sum  $zip" | shasum -a 256 -c --status; then

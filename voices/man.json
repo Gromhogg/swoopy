@@ -15,7 +15,6 @@
   },
   "realistic": {
     "model": "man_t200_ahead.mlmodelc",
-    "sounds": "man_t200_sv3_ahead.mlmodelc",
     "quiet": "man_r4_ahead.mlmodelc",
     "encoder": "contentvec_ahead.mlmodelc",
     "rate": 48000,
