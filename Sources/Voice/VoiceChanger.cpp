@@ -25,6 +25,14 @@
 //     speaker is gone after ~0.1 s of voice) and learns from voiced frames and from smooth low ones (>= 0.5 x median,
 //     not rough), so a deep voice finds its real median; for the first 0.5 s of voice every smooth frame counts and
 //     only < 70 Hz is creak (the guess may be far off);
+//     3.6: the voice's guess is dropped once 25 learned frames have their own median more than 2 half-steps from it
+//     (before, a deep man's 100 Hz against Woman's 120 Hz guess kept the guess for ~4 s of voice: the first 5-10 s of
+//     Woman came out 4-8 half-steps low); the speaker's first 0.5 s of voice is learned at once (not when each voiced
+//     stretch ends), and an earlier chain's median counts as a guess for those first rules (creak, half the median);
+//     once known, frames more than 8 half-steps above the median (a whistle, read an octave or two below itself; a
+//     squeal) don't teach it, unless more than 70 % of the last 400 voiced frames were that far above it or below half
+//     of it (the median is wrong: then they teach it, also the ones below half). Each time a guess goes, both medians
+//     move as fast as at the start for the next 300 learned frames;
 //     the median is read between the histogram's quarter-step bins (so it moves smoothly, not in steps), and the
 //     median in use moves at most 0.3 half-steps per 10 ms while it is finding the speaker, 0.05 once it knows them,
 //   - held notes (3.1.1): a voiced stretch (gaps up to 80 ms) whose slow pitch line (the mean of its last 16 voiced
@@ -67,7 +75,8 @@
 // aiSteadyFrames, aiSteadySt, aiMedianGlideSt, aiMedianWarmFrames, heldMode, heldFrames, heldSt, heldLineFrames,
 // heldGapFrames, learnDelayFrames, medianSlowSt, aiClampMode (+ "ai32" 0 = aiClampMode 0, as 3.1.1), 3.4: floorMode,
 // floorVoiceS, floorGapFrames, voicedKeepDb, voicedKeepFloorDb, singMode, singNoteFrames, singNoteSt, singWindow,
-// singOnShare, singOffShare, singGlideFrames, singTopSt, singResetFrames (+ "hum34" 0 = all of 3.4's off, as 3.3).
+// singOnShare, singOffShare, singGlideFrames, singTopSt, singResetFrames (+ "hum34" 0 = all of 3.4's off, as 3.3),
+// 3.6: seedOwnSt, seedOwnFrames, earlyLearn, farHighSt, farWindow, farShare, ownWarm (+ "pitch36" 0 = all off, as 3.5).
 #include "VoiceChanger.h"
 
 #include <algorithm>
@@ -206,6 +215,23 @@ struct Tuning {
     float singTopSt = 5;             // a sung passage whose slow middle is more than this above the speaker's median
                                      // is moved down as a whole (keeps the tune instead of squashing it at the top)
     float singResetFrames = 1000;    // this long without voice: start afresh
+    // 3.6 (pitch36 0 = all of these as 3.5): a first guess that doesn't fit the speaker goes quickly. Before, a guess
+    // 3-7 half-steps off (a deep man's voice for Woman's 120 Hz, a high woman's for Man's 205 Hz) counted as 1 s of
+    // voice and faded slowly, so the first 5-10 s came out 2-8 half-steps too low (Woman) or too high (Man).
+    float seedOwnSt = 2;             // once seedOwnFrames frames are learned and their own median is more than this
+    float seedOwnFrames = 25;        // from the guess, the guess is dropped (and the AI's median finds it fast again)
+    float earlyLearn = 1;            // until the median is known (warmFrames), frames are learned at once, not when
+                                     // their voiced stretch is over
+    float farHighSt = 8;             // once the median is known, frames more than this above it don't teach it (the
+                                     // tracker reads a whistle an octave or two below it; a squeal, a high laugh: 5 s
+                                     // of whistling moved a man's median to 220 Hz, and it stayed there, because
+                                     // frames below half the median never teach it) ...
+    float farWindow = 400;           // ... unless more than farShare of the last farWindow voiced frames (at least half
+    float farShare = 0.7f;           // of them seen) were that far from it, above or below half of it: then the median
+                                     // is wrong (someone else talking, a guess from an earlier chain) and they teach it
+    float ownWarm = 1;               // a median from an earlier chain is a guess too: the rules that need a known median
+                                     // (creak, frames below half of it, learning at once, farHighSt) wait for warmFrames
+                                     // of this speaker's own frames (a woman after a man stayed 8-10 half-steps off)
 };
 
 struct TuneKey {
@@ -241,6 +267,9 @@ const TuneKey kTuneKeys[] = {
     {"singWindow", &Tuning::singWindow}, {"singOnShare", &Tuning::singOnShare}, {"singOffShare", &Tuning::singOffShare},
     {"singGlideFrames", &Tuning::singGlideFrames}, {"singTopSt", &Tuning::singTopSt},
     {"singResetFrames", &Tuning::singResetFrames},
+    {"seedOwnSt", &Tuning::seedOwnSt}, {"seedOwnFrames", &Tuning::seedOwnFrames}, {"earlyLearn", &Tuning::earlyLearn},
+    {"farHighSt", &Tuning::farHighSt}, {"farWindow", &Tuning::farWindow}, {"farShare", &Tuning::farShare},
+    {"ownWarm", &Tuning::ownWarm},
 };
 
 struct VoiceKey {
@@ -367,6 +396,13 @@ struct VoiceChanger {
     int seedBin = 0;
     float seedWeight = 0;
     bool seeded = false;
+    bool seedDropped = false;   // 3.6: the guess didn't fit the speaker and was dropped (seedOwnSt)
+    int64_t aiFindFrom = 0;     // ... the AI's median finds the speaker again from this many learned frames
+    // 3.6: the last voiced frames, far from the median or not (farHighSt), and whether the median looked wrong
+    static constexpr int kFarFlags = 1024;
+    uint8_t farFlag[kFarFlags] = {};
+    int farAt = 0, farCount = 0, farSum = 0;
+    bool wrongBefore = false;
     float speakerHz = 0;        // the speaker's median measured earlier (voicechanger_set_speaker), 0 = none
     float speakerWeight = 0;
     int64_t learned = 0;        // frames the median has learned from
@@ -472,14 +508,27 @@ struct VoiceChanger {
     }
 
     bool warm() const { return learned >= (int64_t)tuning.warmFrames || speakerHz > 0; }
+    // 3.6: the median is this speaker's (ownWarm), or as before also one from an earlier chain
+    bool known() const { return tuning.ownWarm >= 0.5f ? learned >= (int64_t)tuning.warmFrames : warm(); }
     bool heldRules() const { return tuning.heldMode >= 0.5f; }
 
     // Once a frame: the median in use moves toward the measured one, at most medianGlideSt (heldMode 1: once the
     // speaker is known at most medianSlowSt, and not at all while a note is held).
+    // 3.6: the first guess doesn't fit the speaker (or the median looked wrong): it is dropped, and both medians move
+    // as fast as at the start for a while
+    void dropSeed() {
+        seedWeight = 0;
+        seedDropped = true;
+        aiFindFrom = aiLearned;
+    }
+    bool finding() const {
+        return seedDropped && aiLearned - aiFindFrom < (int64_t)tuning.aiMedianWarmFrames;
+    }
+
     void glideMedian(float measured) {
         if (!(medianUse > 0)) { medianUse = measured; return; }
         if (heldRules() && held) return;
-        const float most = heldRules() && warm() ? std::min(tuning.medianGlideSt, tuning.medianSlowSt) : tuning.medianGlideSt;
+        const float most = heldRules() && warm() && !finding() ? std::min(tuning.medianGlideSt, tuning.medianSlowSt) : tuning.medianGlideSt;
         const float d = std::clamp(semitones(measured / medianUse), -most, most);
         medianUse = (float)(medianUse * std::exp2(d / 12));
     }
@@ -599,11 +648,23 @@ struct VoiceChanger {
         if (!(heldRules() && held)) sing = std::clamp(sing + std::clamp((singOn ? 1.0f : 0.0f) - sing, -step, step), 0.0f, 1.0f);
     }
 
+    // 3.6, once a voiced frame: is it far from the speaker's median (farOff)? Says whether the median looks wrong
+    // (more than farShare of the last farWindow voiced frames were far from it, at least half of them seen).
+    bool noteFar(bool farOff) {
+        const int W = std::clamp((int)tuning.farWindow, 10, kFarFlags);
+        if (farCount >= W) farSum -= farFlag[(farAt - W + kFarFlags) % kFarFlags];
+        else farCount++;
+        farFlag[farAt] = farOff ? 1 : 0;
+        farSum += farOff ? 1 : 0;
+        farAt = (farAt + 1) % kFarFlags;
+        return farCount >= W / 2 && (float)farSum > tuning.farShare * (float)farCount;
+    }
+
     // A frame the speaker's median may learn from: at once (heldMode 0), or learnDelayFrames later unless it turns
     // out to be part of a held note.
     void learn(float f0) {
         if (singOn) return;  // 3.4: a sung passage doesn't teach the medians (a tune isn't the speaking voice)
-        if (!heldRules()) { learnMedian(f0); return; }
+        if (!heldRules() || (tuning.earlyLearn >= 0.5f && !known())) { learnMedian(f0); return; }
         if (held) return;
         if (pendCount == kPending) {  // (can't happen with the delay limited above) learn the oldest now
             const float f = pending[pendAt].f0;
@@ -661,7 +722,16 @@ struct VoiceChanger {
         // The first guess fades as real frames come in: slowly while they fit it, fast when they are far from it (a
         // speaker the guess doesn't fit, e.g. a man using the Man voice).
         const bool far = std::fabs(semitones(f0 / binHz(seedBin))) > tuning.seedFarSt;
+        const float before = seedWeight;
         seedWeight = std::max(0.0f, seedWeight - (far ? tuning.seedFarFade : 0.25f));
+        // 3.6: the voice's guess goes at once when the speaker's own frames don't fit it (a median from an earlier
+        // chain only when they are far from it), and the medians then find the speaker as fast as at the start (with a
+        // median from an earlier chain, the AI's median crawled at 1 half-step a second)
+        if (tuning.seedOwnSt > 0 && before > 0 &&
+            ((seedWeight > 0 && !(speakerHz > 0) && learned >= (int64_t)tuning.seedOwnFrames &&
+              std::fabs(semitones(medianHzBetween(mapBins, seedBin, 0) / binHz(seedBin))) > tuning.seedOwnSt) ||
+             (seedWeight <= 0 && far)))
+            dropSeed();
         learnAiMedian(f0);
     }
 
@@ -699,8 +769,8 @@ struct VoiceChanger {
                                            : (float)binHz(medianBin(aiBins, seedBin, seedWeight));
         if (!(aiMedianUse > 0)) { aiMedianUse = measured; return aiMedianUse; }
         if (heldRules() && held) return aiMedianUse;  // stands still while a note is held
-        const bool finding = aiLearned < (int64_t)tuning.aiMedianWarmFrames && !(speakerHz > 0);
-        const float most = finding ? tuning.medianGlideSt : tuning.aiMedianGlideSt;
+        const bool fast = (aiLearned < (int64_t)tuning.aiMedianWarmFrames && !(speakerHz > 0)) || finding();
+        const float most = fast ? tuning.medianGlideSt : tuning.aiMedianGlideSt;
         const float d = std::clamp(semitones(measured / aiMedianUse), -most, most);
         aiMedianUse = (float)(aiMedianUse * std::exp2(d / 12));
         return aiMedianUse;
@@ -878,7 +948,7 @@ struct VoiceChanger {
         // the slow middle of the voice above its median (1 s of voiced frames; a held note doesn't move it)
         if (voiced && tuning.singMode >= 0.5f && !(heldRules() && held))
             devSlow += 0.01f * (std::clamp(semitones(f0 / aiMedian), -12.0f, 18.0f) - devSlow);
-        bool creak = false, rough = false;
+        bool creak = false, rough = false, farHigh = false;
         if (voiced) {
             if (prevCount < 3) prev[prevCount++] = f0;
             else { prev[0] = prev[1]; prev[1] = prev[2]; prev[2] = f0; }
@@ -889,11 +959,20 @@ struct VoiceChanger {
             }
             rough = jitter > tuning.creakJitter;
             // Until the median is known (the first guess may be far off) only very low and rough frames are creak.
-            const bool known = warm();
-            creak = f0 < tuning.creakHz || (known && f0 < tuning.creakRatio * measured) || rough;
+            const bool known = this->known();
+            // 3.6: a frame far above the median doesn't teach it, unless the median looks wrong (see farHighSt)
+            bool wrong = false;
+            if (tuning.farHighSt > 0) {
+                farHigh = known && semitones(f0 / measured) > tuning.farHighSt;
+                wrong = noteFar(farHigh || (known && !rough && f0 < 0.5f * measured));
+                if (wrong && !wrongBefore) dropSeed();  // the medians find the speaker again, as at the start
+                wrongBefore = wrong;
+            }
+            creak = f0 < tuning.creakHz || (known && !wrong && f0 < tuning.creakRatio * measured) || rough;
             // The speaker's median also learns from smooth low frames (a deep voice talks below 70 Hz; without them
             // its median would stay at the first guess). Rough frames and octave-low ones (fry) stay out.
-            if (creak && !rough && (f0 >= 0.5f * measured || !known)) learn(f0);
+            if (creak && !rough && (f0 >= 0.5f * measured || !known || wrong)) learn(f0);
+            if (wrong) farHigh = false;
         } else {
             prevCount = 0;
             creak = levelOk && ap >= tuning.creakApLow && ap <= tuning.creakApHigh && lastGoodAge <= 15;
@@ -901,7 +980,7 @@ struct VoiceChanger {
         frames++;
         float target = 0, aiWant = 0;  // aiWant: the pitch the AI voice should sing now (0 = unvoiced)
         if (voiced && !creak) {
-            learn(f0);
+            if (!farHigh) learn(f0);
             const float off = semitones(voice.targetHz / median);
             const float dev = std::clamp(semitones(f0 / median), -12.0f, 12.0f);
             lastDev = dev;
@@ -1064,6 +1143,7 @@ struct VoiceChanger {
         singStAt = singStCount = singGap = singQuiet = 0;
         singFlagAt = singFlagCount = singFlagSum = 0;
         singOn = false; sing = 0; devSlow = 0;
+        farAt = farCount = farSum = 0; wrongBefore = false;
         flagLatest = -1;
         frames = voicedFrames = creakFrames = 0;
         sibTop.clear(); sibOrigTop.clear();
@@ -1211,6 +1291,8 @@ void voicechanger_set_speaker(VoiceChanger *c, float medianHz, float weightFrame
     c->speakerHz = ok ? medianHz : 0;
     c->speakerWeight = ok ? weightFrames : 0;
     c->seeded = false;   // the first guess is made again
+    c->seedDropped = false;
+    c->aiFindFrom = c->aiLearned;
     c->medianUse = 0;
     c->aiMedianUse = 0;
     if (c->hasVoice) c->applyVoice();
@@ -1349,6 +1431,15 @@ int voicechanger_tune(VoiceChanger *c, const char *key, float value) {
         c->tuning.voicedKeepDb = on ? d.voicedKeepDb : 0;
         c->tuning.voicedKeepFloorDb = on ? d.voicedKeepFloorDb : 0;
         c->tuning.singMode = on ? d.singMode : 0;
+        return 1;
+    }
+    if (std::strcmp(key, "pitch36") == 0) {  // 0: every 3.6 change off (3.5's sound exactly); 1: the 3.6 defaults
+        const bool on = value != 0;
+        const Tuning d;
+        c->tuning.seedOwnSt = on ? d.seedOwnSt : 0;
+        c->tuning.earlyLearn = on ? d.earlyLearn : 0;
+        c->tuning.farHighSt = on ? d.farHighSt : 0;
+        c->tuning.ownWarm = on ? d.ownWarm : 0;
         return 1;
     }
     for (int k = 0; k < kVoiceKeyCount; ++k) {
