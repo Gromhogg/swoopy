@@ -1207,7 +1207,7 @@ final class ShiftCard: NSView {
     private let buttons: NSStackView
     private let stack = NSStackView()
     private var rows: [NSView] = []
-    private var tightAfter: [NSView] = []  // rows followed by a tight row (see addRow)
+    private var tightAfter: [(above: NSView, row: NSView)] = []  // rows followed by a tight row (see addRow)
     private var widths: [NSLayoutConstraint] = []
     private var buttonWidths: [NSLayoutConstraint] = []
     private var heights: [Int: CGFloat] = [:]  // height needed at each scale
@@ -1287,11 +1287,16 @@ final class ShiftCard: NSView {
     // Adds a full-width row at the bottom of the card (for example `ShiftCard.switchRow`). Add rows while
     // building the window, before it's laid out. `tight`: closer to the row above (it belongs with it).
     func addRow(_ row: NSView, tight: Bool) {
-        if tight, let above = stack.arrangedSubviews.last {
-            tightAfter.append(above)
-            if scale > 0 { stack.setCustomSpacing((6 * scale).rounded(), after: above) }
-        }
+        if tight, let above = stack.arrangedSubviews.last { tightAfter.append((above, row)) }
         addRow(row)
+        spaceTightRows()
+    }
+
+    // A tight row sits closer to the row above it, but only while it shows: hidden, the row after it gets the usual
+    // space.
+    private func spaceTightRows() {
+        guard scale > 0 else { return }
+        for (above, row) in tightAfter { stack.setCustomSpacing(row.isHidden ? stack.spacing : (6 * scale).rounded(), after: above) }
     }
 
     func addRow(_ row: NSView) {
@@ -1387,7 +1392,7 @@ final class ShiftCard: NSView {
             stack.edgeInsets = NSEdgeInsets(top: (14 * s).rounded(), left: 0, bottom: (16 * s).rounded(), right: 0)
             stack.spacing = (12 * s).rounded()
             if showsAmount { stack.setCustomSpacing((8 * s).rounded(), after: amount) }
-            tightAfter.forEach { stack.setCustomSpacing((6 * s).rounded(), after: $0) }
+            spaceTightRows()
             rows.forEach { ($0 as? CardRow)?.onScale(s) }
             needsDisplay = true
         }
@@ -1428,7 +1433,10 @@ final class ShiftCard: NSView {
     }
 
     // Call when a row is shown or hidden.
-    func forgetHeights() { heights = [:] }
+    func forgetHeights() {
+        heights = [:]
+        spaceTightRows()
+    }
 
     // Updates the number and buttons; `active` shows the card off (everything in it still works then, a little
     // fainter: the settings are used when the card is turned on), `waiting` fades just the number (on, but the
