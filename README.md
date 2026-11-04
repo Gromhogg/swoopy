@@ -2,6 +2,12 @@
 
 Change the pitch of **what you hear** (any app, like Spotify, Apple Music or YouTube) and of **your voice** (as a mic called "Pitch Shift Mic" for Discord, Zoom and others), live, or turn your voice into a woman's or a man's (Mac). For Mac, and Windows (beta).
 
+[![Swoopy changing the pitch of a song, live](docs/demo/swoopy-demo.gif)](https://charliesweetland.com/swoopy)
+
+Click it to try it yourself on the website, or watch the [video with sound](docs/demo/swoopy-demo.mp4).
+
+Music: "Voxel Revolution" by Kevin MacLeod (incompetech.com), licensed under CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/).
+
 ## Install on a Mac
 
 **Download (double-click):**
