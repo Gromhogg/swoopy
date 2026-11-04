@@ -27,6 +27,11 @@ struct Settings {
     double cutHz = 600;       // the lower sound's route carries what is below this
     bool split = true;        // the lower sound takes its own route
     double limitLookMs = 10, limitReleaseMs = 300;  // the safety limiter
+    // A jump that missed its hit by less than this is left alone, and the next gap makes up the rest. Jumping again
+    // for the same hit, often back the other way, makes two or three joins where one would do. Going up by more than
+    // settleUpTo half-steps every hit is still put right, because there the drums need it.
+    double settleMs = 8, settleUpTo = 2.5;
+    double offCost = 0.3;     // how much a join's likeness is marked down for missing its hit by the full tolerance
 };
 
 double bessel0(double x) {
@@ -417,6 +422,7 @@ struct HeavyChain {
     int tapeDelay = 16800, lookAhead = 16800;
     bool planned = false;
     double planAt = 0, planJump = 0, planLikeness = 0;
+    int64_t planHit = -1, aimedHit = -1;
     long long jumps = 0, forced = 0;
     double likenessSum = 0;
     std::vector<long long> jumpLog;
@@ -536,14 +542,21 @@ struct HeavyChain {
         }
         // Safety: the head must never reach sound that hasn't arrived.
         if (std::fabs(error) > 0.85 * lookAhead) { jump(-error, 0); forced++; return; }
-        if (planned) { if (head >= planAt) jump(planJump, planLikeness); return; }
+        if (planned) {
+            if (head >= planAt) { if (planHit >= 0) aimedHit = planHit; jump(planJump, planLikeness); }
+            return;
+        }
         double fadeRead = fadeLength * speed, guard = set.guardMs * 0.001 * rate, hold = set.holdMs * 0.001 * rate;
         double seen = double(written) - 64;
         if (seen - head < fadeRead + guard) return;
+        // The jump that lands `target` on time; the same at any moment in the gap.
+        auto needFor = [&](double target) { return (target - speed * (target - trueTime)) - head; };
         int64_t hitAt = hitAfter(head + fadeRead + guard, seen);
+        if (hitAt >= 0 && hitAt == aimedHit && semis <= set.settleUpTo && std::fabs(needFor(double(hitAt))) < set.settleMs * 0.001 * rate)
+            hitAt = hitAfter(double(aimedHit), seen);
         bool real = hitAt >= 0;
         double target = real ? double(hitAt) : seen;
-        double need = (target - speed * (target - trueTime)) - head;  // landing on time; the same at any moment in the gap
+        double need = needFor(target);
         bool down = speed < 1;
         int minJump = int(set.jumpMinMs * 0.001 * rate), maxJump = int((down ? set.downJumpMaxMs : set.jumpMaxMs) * 0.001 * rate), tolerance = int(set.toleranceMs * 0.001 * rate);
         int fadeUse = fadeLength;
@@ -579,7 +592,7 @@ struct HeavyChain {
             for (int j = int(need) - tolerance; j <= int(need) + tolerance; j += 4) {
                 if ((j < 0) != (need < 0) || std::abs(j) < minJump) continue;
                 if (p + j < 0) continue;
-                double q = likenessRough(int64_t(p), j, lengthRough);
+                double q = likenessRough(int64_t(p), j, lengthRough) - set.offCost * std::fabs(j - need) / std::max(1, tolerance);
                 if (q > best) { best = q; bestAt = int64_t(p); bestJump = j; }
             }
         }
@@ -590,6 +603,7 @@ struct HeavyChain {
             if (q > bestExact) { bestExact = q; exactJump = j; }
         }
         planned = true; planAt = double(bestAt); planJump = exactJump; planLikeness = bestExact; planFade = fadeUse;
+        planHit = real && !part && !capped ? hitAt : -1;
     }
 
     void pull(float *left, float *right, int frames) {
@@ -674,6 +688,9 @@ int heavy_tune(HeavyChain *chain, const char *key, double value) {
     else if (k == "cuthz") { s.cutHz = value; chain->route.design(chain->rate, value); }
     else if (k == "limlookms") { s.limitLookMs = value; chain->limiter.init(chain->rate, s.limitLookMs, s.limitReleaseMs); }
     else if (k == "limreleasems") { s.limitReleaseMs = value; chain->limiter.init(chain->rate, s.limitLookMs, s.limitReleaseMs); }
+    else if (k == "settlems") s.settleMs = value;
+    else if (k == "settleupto") s.settleUpTo = value;
+    else if (k == "offcost") s.offCost = value;
     else return 0;
     chain->applySettings();
     chain->applyDelay();

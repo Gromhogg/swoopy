@@ -10,7 +10,7 @@ extern "C" {
 // Keys and defaults: the Settings at the top of HeavyChain.cpp, by their lower-case names ("fadems", "jumpminms",
 // "jumpmaxms", "matchms", "tolerancems", "holdms", "guardms", "matchlowhz", "matchhighhz", "sensitivity", "latems",
 // "heldminms", "heldfadems", "downjumpmaxms", "downheldminms", "downheldfadems", "cuthz", "limlookms",
-// "limreleasems", and "split": 0 keeps everything on the tape).
+// "limreleasems", "settlems", "settleupto", "offcost", and "split": 0 keeps everything on the tape).
 // Returns 0 if the key is unknown.
 int heavy_tune(HeavyChain *chain, const char *key, double value);
 
