@@ -1,5 +1,6 @@
-// Hotkeys (Pitch Shift Pro): keys that work while another app is in front. One each for Input pitch shifter on/off,
-// Voice changer on/off and push-to-talk, and one for each sound. RegisterEventHotKey needs no permission from the Mac,
+// Hotkeys: keys that work while another app is in front. One each for Input pitch shifter on/off, Voice changer on/off
+// and push-to-talk, and one for each sound. Free, except the Voice changer's key and the sounds' keys, which are Pitch
+// Shift Pro like what they do. RegisterEventHotKey needs no permission from the Mac,
 // and it tells when a key goes up as well as down.
 import AppKit
 import Carbon.HIToolbox
@@ -116,9 +117,9 @@ final class PretendKeys: KeySystem {
     func remove(id: UInt32) { held[id] = nil }
 }
 
-// The keys that are set, and what they do. Sounds keep theirs in the Soundboard's list. All of it is Pitch Shift Pro:
-// while that's locked no key is taken and push-to-talk is off, and what's saved is kept for later. Setting the
-// push-to-talk key turns it on, and clearing it turns it off. If another app has that key it stays off too, or the mic
+// The keys that are set, and what they do. Sounds keep theirs in the Soundboard's list. The Voice changer's key and the
+// sounds' keys are Pitch Shift Pro: while that's locked they aren't taken, and what's saved is kept for later. Setting
+// the push-to-talk key turns it on, and clearing it turns it off. If another app has that key it stays off too, or the mic
 // could never be heard.
 final class Hotkeys {
     enum Action: Hashable { case voice, changer, talk, sound(String) }
@@ -167,6 +168,14 @@ final class Hotkeys {
 
     func key(for action: Action) -> HotKey? { wanted[action] }
 
+    // The Voice changer's key and the sounds' keys are Pitch Shift Pro, like the Voice changer and the Soundboard.
+    static func needsPro(_ action: Action) -> Bool {
+        if case .sound = action { return true }
+        return action == .changer
+    }
+
+    func isLocked(_ action: Action) -> Bool { Self.needsPro(action) && !unlocked() }
+
     var soundsWithKeys: [Action] { board.sounds.filter { $0.key != nil }.map { .sound($0.file) } }
 
     func hasSound(_ file: String) -> Bool { board.files.contains(file) }
@@ -182,7 +191,7 @@ final class Hotkeys {
 
     // Takes the keys that are set from the Mac and lets go of the rest. Gives back the ones another app has.
     @discardableResult func refresh() -> [Action] {
-        let wanted = paused || !unlocked() ? [:] : self.wanted
+        let wanted = paused ? [:] : self.wanted.filter { !isLocked($0.key) }
         for (action, entry) in registered where wanted[action] != entry.key {
             system.remove(id: entry.id)
             registered[action] = nil
@@ -279,6 +288,13 @@ final class HotkeysPanel: NSObject, NSWindowDelegate {
 
     var isOpen: Bool { panel.isVisible }
 
+    // Pitch Shift Pro was locked or unlocked: the rows show it.
+    func update() {
+        guard isOpen else { return }
+        if let catching, hotkeys.isLocked(catching) { stopCatching() }
+        reload()
+    }
+
     // Pictures: kept out of sight under the desktop picture, like the Soundboard.
     func open(sound file: String? = nil) {
         stopCatching()
@@ -324,19 +340,31 @@ final class HotkeysPanel: NSObject, NSWindowDelegate {
         panel.setFrameTopLeftPoint(NSPoint(x: panel.frame.minX, y: top))
     }
 
+    // A Pitch Shift Pro key while that's locked: dimmed, with a small lock after its name, and it can't be changed.
     private func row(_ action: Hotkeys.Action) -> NSView {
-        let name = hotkeys.name(of: action), key = hotkeys.key(for: action)
+        let name = hotkeys.name(of: action), key = hotkeys.key(for: action), locked = hotkeys.isLocked(action)
         let label = NSTextField(labelWithString: name)
         label.lineBreakMode = .byTruncatingTail
+        if locked, let font = label.font, let lock = GradientSlider.lockImage(size: font.pointSize - 2) {
+            let words = NSMutableAttributedString(string: name + " ", attributes: [.font: font, .foregroundColor: NSColor.tertiaryLabelColor])
+            let attachment = NSTextAttachment()
+            attachment.image = lock
+            attachment.bounds = NSRect(x: 0, y: ((font.capHeight - lock.size.height) / 2).rounded(), width: lock.size.width, height: lock.size.height)
+            words.append(NSAttributedString(attachment: attachment))
+            label.attributedStringValue = words
+            label.toolTip = "Pitch Shift Pro"
+        }
         let button = NSButton(title: action == catching ? "Press a key…" : key?.name ?? "Set Key…", target: self, action: #selector(keyClicked))
         button.bezelStyle = .rounded
         button.setAccessibilityLabel("\(name) key")
+        button.isEnabled = !locked
+        if locked { button.toolTip = "Pitch Shift Pro" }
         keyButtons.append(button)
         let glyph = NSImage.SymbolConfiguration(paletteColors: [.secondaryLabelColor])
         let clear = NSButton(image: NSImage(systemSymbolName: "xmark.circle.fill", accessibilityDescription: "Clear")?.withSymbolConfiguration(glyph) ?? NSImage(),
                              target: self, action: #selector(clearClicked))
         clear.isBordered = false
-        clear.isHidden = key == nil
+        clear.isHidden = key == nil || locked
         clear.setAccessibilityLabel("Clear \(name) key")
         clearButtons.append(clear)
         let row = NSStackView(views: [label, button, clear])
@@ -540,8 +568,11 @@ func checkHotkeys() -> Bool {
 
     unlocked = false
     hotkeys.refresh()
-    check("Pro locked: no key taken, mic open", holds([]) && !voice.pushToTalk && !micHeld)
-    check("Pro locked: keys stay saved", hotkeys.key(for: .talk) == f5)
+    check("Pro locked: the Voice changer's key let go, the free keys kept, push-to-talk on", holds([ctrl1, f5]) && voice.pushToTalk && micHeld)
+    check("Pro locked: its key stays saved", hotkeys.key(for: .changer) == f6)
+    send(ctrl1, down: true)
+    send(ctrl1, down: false)
+    check("Pro locked: the Input pitch shifter key still works", presses.last == .voice && presses.count == 3)
     unlocked = true
     hotkeys.refresh()
     check("Pro unlocked: keys back, push-to-talk on", holds([ctrl1, f6, f5]) && micHeld)
@@ -553,6 +584,12 @@ func checkHotkeys() -> Bool {
     send(ctrl2, down: false)
     check("sound key pressed", presses.last == .sound("a.wav"))
     check("sound keys listed", hotkeys.soundsWithKeys == [.sound("a.wav")])
+    unlocked = false
+    hotkeys.refresh()
+    check("Pro locked: the sound's key let go too", holds([ctrl1, f5]) && hotkeys.key(for: .sound("a.wav")) == ctrl2)
+    unlocked = true
+    hotkeys.refresh()
+    check("Pro unlocked: the sound's key back", holds([ctrl1, f6, f5, ctrl2]))
     let again = Hotkeys(voice: voice, board: Soundboard(voice: voice, sounds: Soundboard.saved(defaults, folder: folder), saves: false),
                         defaults: defaults, saves: true, system: PretendKeys())
     check("keys load from the saved settings", again.key(for: .voice) == ctrl1 && again.key(for: .changer) == f6

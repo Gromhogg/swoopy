@@ -2158,23 +2158,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
             if preview == nil && !voice.running { DefaultMic.giveBack() }
             if soundboard.isOpen { soundboard.close() }
             board.stop()
-            if hotkeysPanel.isOpen { hotkeysPanel.close() }
         }
         buildMenu()
         showUnlockButton()
         styleSounds()
         refresh()
         if preview == nil { useHotkeys() }
+        hotkeysPanel.update()  // the Voice changer's and the sounds' keys are Pro
     }
 
     // MARK: Hotkeys
 
     @objc func showHotkeys() {
-        guard Pro.shared.unlocked else { showUnlock(); return }  // hotkeys are part of Pitch Shift Pro
         hotkeysPanel.open()
     }
 
-    // Takes the saved keys, or none while Pitch Shift Pro is locked. A key another app has stays off, and says so.
+    // Takes the saved keys (the Voice changer's and the sounds' only while Pitch Shift Pro is unlocked). A key another
+    // app has stays off, and says so.
     private func useHotkeys() {
         let taken = hotkeys.refresh().compactMap { hotkeys.key(for: $0)?.name }
         guard !taken.isEmpty else { return }
@@ -3016,7 +3016,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         if preview.contains("menu") {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { self.hearCard.picker.performClick(nil) }
         }
-        if preview.contains("hotkeys"), pro { hotkeysPanel.showPicture(previewStates) }
+        if preview.contains("hotkeys") { hotkeysPanel.showPicture(previewStates) }
         if preview.contains("advanced-alert") {  // the alert shown when Advanced processing is turned on
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                 self.advancedSwitch.isOn = true

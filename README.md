@@ -65,12 +65,13 @@ More help: [windows/README.md](windows/README.md).
 - The Soundboard works with **Input pitch shifter** off too: your mic then goes into the call unchanged (or through the voice changer, if it's on).
 - Use headphones in calls. If your voice cuts out, turn off the call app's noise suppression (like Krisp).
 
-**Hotkeys** (Mac, Pro)
+**Hotkeys** (Mac)
 
 - Choose **Hotkeys…** in the **Pitch Shift** menu to set keys for **Input pitch shifter** on/off, **Voice changer** on/off and **Push to talk**. They work while another app is in front.
 - Right-click a sound and choose **Set Key…** to play it with a key, even with the Soundboard closed. Press the key again to stop it.
 - A key needs ⌘ or ⌃, or it can be an F-key on its own. Other apps can't use a key while it's set here.
 - **Push to talk:** setting a key turns it on. Your mic is then silent unless you hold the key down. Sounds still play. Clear the key to turn it off.
+- Hotkeys are free, except the **Voice changer** key and the sounds' keys, which need Pro like the Voice changer and the Soundboard.
 
 **Voice changer** (Mac)
 
@@ -89,7 +90,7 @@ More help: [windows/README.md](windows/README.md).
 **Pitch Shift Pro ($5, Mac)**
 
 - Free: **Output pitch shifter** with Advanced processing, and **Input pitch shifter** in the Cartoon style, with **Test**.
-- Pro adds the **Voice changer** (with your own voices), the **Natural ↔ Cartoon** and **Bass ↔ Treble** sliders, **Auto EQ**, **Deeper when slow** (with **Higher when fast**), the **Soundboard** and **Hotkeys**. They show a small lock until you unlock them.
+- Pro adds the **Voice changer** (with your own voices), the **Natural ↔ Cartoon** and **Bass ↔ Treble** sliders, **Auto EQ**, **Deeper when slow** (with **Higher when fast**) and the **Soundboard**. They show a small lock until you unlock them.
 - To get a key, click **Unlock Pro** at the top right, then **Email for a key** (or email cbsweetland@gmail.com). Copy the whole key from the email you get back (it's long, 4 lines; spaces and line breaks don't matter), paste it in and click **Unlock**. It works on all your Macs, for good, with no internet needed. Keys sent out before (25 characters) keep working.
 
 ## Your own voices (Mac)

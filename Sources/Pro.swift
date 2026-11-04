@@ -181,7 +181,7 @@ final class Pro {
 
     // What Pro adds, for the unlock window.
     static let features = ["the Voice changer", "Natural ↔ Cartoon", "Bass ↔ Treble", "Auto EQ", "Deeper when slow",
-                           "the Soundboard", "hotkeys"]
+                           "the Soundboard"]
 
     // Pictures only: a key made with the test key pair in tools/pro-keys-test.txt (it unlocks nothing).
     static let exampleKey = "P23WN-RJ3JB-23GWE-NTH5S-KX5XB-4TQEQ-6XS6N-AWQEY-3ZSWK-D864K-5FQ8N-4H3PJ-7UJJ2-FNNN5-RB7BG-"
