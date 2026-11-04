@@ -26,6 +26,7 @@ struct Settings {
     double downJumpMaxMs = 160, downHeldMinMs = 120, downHeldFadeMs = 40;
     double cutHz = 600;       // the lower sound's route carries what is below this
     bool split = true;        // the lower sound takes its own route
+    double limitLookMs = 10, limitReleaseMs = 300;  // the safety limiter
 };
 
 double bessel0(double x) {
@@ -175,6 +176,66 @@ struct Limiter {
             position = 0;
             sum = 0;
             for (int k = 0; k < length; k++) sum += held[k];
+        }
+    }
+};
+
+// Super Advanced's own safety limiter. Its two routes, joined again, no longer line up the way the song's mastering
+// left them, so a loud song's peaks can go a few dB over full scale. A limiter that pulls those down within 2 ms and
+// lets go within 25 ms changes the gain inside each bass wave, which is heard as distortion. This one looks further
+// ahead, lowers the gain along a smooth curve, and lets it back up slowly.
+struct SmoothLimiter {
+    int look = 240, length = 241, firstLength = 121, secondLength = 121;
+    double release = 0.9999, holdValue = 1, firstSum = 121, sum = 121;
+    int64_t now = 0;
+    int position = 0, first = 0, second = 0, front = 0, count = 0;
+    std::vector<float> delay[2];
+    std::vector<double> need, held, smoothed;
+    std::vector<int64_t> rising;  // for the lowest need: times whose needs rise, oldest first (a ring)
+
+    void init(double rate, double lookMs, double releaseMs) {
+        look = std::max(2, int(std::lround(lookMs * 0.001 * rate)) & ~1); length = look + 1;
+        firstLength = look / 2 + 1; secondLength = look - firstLength + 2;
+        release = std::exp(-1.0 / (releaseMs * 0.001 * rate));
+        delay[0].assign(length, 0.f); delay[1].assign(length, 0.f);
+        need.assign(length, 1.0); held.assign(firstLength, 1.0); smoothed.assign(secondLength, 1.0); rising.assign(length, 0);
+        holdValue = 1; firstSum = firstLength; sum = secondLength;
+        now = 0; position = first = second = front = count = 0;
+    }
+    inline void run(float &left, float &right) {
+        double peak = std::max(std::fabs(double(left)), std::fabs(double(right)));
+        double wanted = peak > LimiterCeiling ? LimiterCeiling * (1.0 - 4e-6) / peak : 1.0;
+        // The lowest need of the last `length` samples.
+        if (count > 0 && rising[front] <= now - length) { front = front + 1 == length ? 0 : front + 1; count--; }
+        need[position] = wanted;
+        while (count > 0 && need[rising[(front + count - 1) % length] % length] >= wanted) count--;
+        rising[(front + count) % length] = now; count++;
+        double lowest = need[rising[front] % length];
+        holdValue = lowest < holdValue ? lowest : lowest - (lowest - holdValue) * release;
+        if (lowest == 1.0 && holdValue > 1.0 - 1e-7) holdValue = 1.0;
+        // Two running averages one after the other: the gain eases down along an S-curve, and is low enough by the
+        // time the peak comes out.
+        firstSum += holdValue - held[first]; held[first] = holdValue;
+        double eased = firstSum / firstLength;
+        sum += eased - smoothed[second]; smoothed[second] = eased;
+        double gain = std::min(1.0, sum / secondLength);
+        int oldest = position + 1 == length ? 0 : position + 1;
+        delay[0][position] = left; delay[1][position] = right;
+        float l = delay[0][oldest], r = delay[1][oldest];
+        if (gain < 1.0) {
+            l = float(std::max(-LimiterCeiling, std::min(LimiterCeiling, l * gain)));
+            r = float(std::max(-LimiterCeiling, std::min(LimiterCeiling, r * gain)));
+        }
+        left = l; right = r;
+        now++;
+        if (++position == length) position = 0;
+        if (++first == firstLength) {  // add the gains up again once per lap, so rounding never builds up
+            first = 0; firstSum = 0;
+            for (double v : held) firstSum += v;
+        }
+        if (++second == secondLength) {
+            second = 0; sum = 0;
+            for (double v : smoothed) sum += v;
         }
     }
 };
@@ -345,7 +406,7 @@ struct HeavyChain {
     std::vector<uint8_t> hits;
     TapeReader reader;
     HitFinder finder;
-    Limiter limiter;
+    SmoothLimiter limiter;
     double head = 0, nextHead = 0;
     int fade = -1, waitAfterJump = 0;
     float likeness = 1;
@@ -569,7 +630,7 @@ HeavyChain *heavy_new(double sampleRate, int maxFrames) {
     chain->hits.assign(size / chain->hitStep + 1, 0);
     chain->applySettings();
     chain->finder.init(sampleRate, std::max(1, int(std::lround(sampleRate / 48000))));
-    chain->limiter.init(sampleRate);
+    chain->limiter.init(sampleRate, chain->set.limitLookMs, chain->set.limitReleaseMs);
     chain->reader.init();
     chain->jumpLog.reserve(20000);
     chain->route.init(sampleRate, size, chain->set.cutHz);
@@ -611,6 +672,8 @@ int heavy_tune(HeavyChain *chain, const char *key, double value) {
     else if (k == "downheldfadems") s.downHeldFadeMs = value;
     else if (k == "split") s.split = value != 0;
     else if (k == "cuthz") { s.cutHz = value; chain->route.design(chain->rate, value); }
+    else if (k == "limlookms") { s.limitLookMs = value; chain->limiter.init(chain->rate, s.limitLookMs, s.limitReleaseMs); }
+    else if (k == "limreleasems") { s.limitReleaseMs = value; chain->limiter.init(chain->rate, s.limitLookMs, s.limitReleaseMs); }
     else return 0;
     chain->applySettings();
     chain->applyDelay();
