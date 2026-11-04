@@ -117,7 +117,7 @@ protocol HearPlayer: AnyObject {
 
 // Bass ↔ Treble and Auto EQ for normal mode: Advanced processing's own stages without its pitch shifting, then a smooth
 // safety limiter (ToneChain in Sources/Advanced). The limiter only works while one of them is in use, so with the
-// slider in the middle and Auto EQ off the sound is exactly as before, only `latencyFrames` (10 ms) later.
+// slider in the middle and Auto EQ off the sound is exactly as before, only `latencyFrames` (20 ms) later.
 final class ToneProcessor {
     private let chain: OpaquePointer
     private let pointers: UnsafeMutablePointer<UnsafeMutablePointer<Float>?>
@@ -319,7 +319,7 @@ final class Player: HearPlayer {
     var delays: (cushion: Double, shifter: Double, device: Double) {
         let t = timing
         // Rubber Band's real delay is about 110 ms at 48 kHz (its "start delay" alone undercounts it), plus the
-        // tone stage's 10 ms.
+        // tone stage's 20 ms.
         let tone = Double(toneProcessor?.latencyFrames ?? 0) / format.sampleRate * 1000
         return (t.cushion, (t.shifter > 0 ? 110.0 : 0) + tone, t.device)
     }

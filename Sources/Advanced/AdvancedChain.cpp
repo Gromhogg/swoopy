@@ -1780,21 +1780,21 @@ namespace {
 
 // The tone stage's safety limiter, smoother than the engine's (the same idea as Super Advanced's). A boost can push a
 // loud song over full scale. A limiter that pulls that down within 2 ms and lets go within 25 ms changes the gain inside
-// each bass wave, which is heard as distortion. This one looks 10 ms ahead, lowers the gain along a smooth S-curve
-// (two running averages of the lowest gain needed), and lets it back up over 300 ms. Off (`enabled` false) or under the
+// each bass wave, which is heard as distortion. This one looks 20 ms ahead, lowers the gain along a smooth S-curve
+// (two running averages of the lowest gain needed), and lets it back up over 1 s (Super Advanced's final settings). Off (`enabled` false) or under the
 // ceiling its gain is exactly 1: the output is the input delayed by `look` samples, bit for bit.
 struct SmoothLimiter {
     static constexpr double ceiling = 0.966;  // -0.3 dBFS
     bool enabled = true;
-    int nch = 2, look = 480, length = 481, firstLength = 241, secondLength = 241;
-    double release = 0.9999, holdValue = 1, firstSum = 241, sum = 241;
+    int nch = 2, look = 960, length = 961, firstLength = 481, secondLength = 481;
+    double release = 0.99998, holdValue = 1, firstSum = 481, sum = 481;
     int64_t now = 0;
     int position = 0, first = 0, second = 0, front = 0, count = 0;
     std::vector<float> delay[MAXCH];
     std::vector<double> need, held, smoothed;
     std::vector<int64_t> rising;  // for the lowest need: times whose needs rise, oldest first (a ring)
 
-    void init(double rate, int channels, double lookMs = 10, double releaseMs = 300) {
+    void init(double rate, int channels, double lookMs = 20, double releaseMs = 1000) {
         nch = channels;
         look = std::max(2, int(std::lround(lookMs * 0.001 * rate)) & ~1); length = look + 1;
         firstLength = look / 2 + 1; secondLength = look - firstLength + 2;

@@ -86,9 +86,9 @@ void advanced_get_info(const AdvancedChain *chain, AdvancedInfo *info);
 
 // Bass and treble and Auto EQ on their own, for the app's normal mode (pitch shifting without Advanced processing): the
 // same stages as advanced_set_tone and advanced_set_auto_eq (same ranges, glides and fades), then a smooth safety
-// limiter (it looks 10 ms ahead and lets go over 300 ms, so it doesn't distort bass), which only works while bass,
+// limiter (it looks 20 ms ahead and lets go over 1 s, so it doesn't distort bass), which only works while bass,
 // treble or Auto EQ is in use. With both untouched (0 dB, Auto EQ off with all offsets 0: the default) the output is
-// exactly the input, delayed by tonechain_latency_frames (the limiter's 10 ms look-ahead); there is no other delay.
+// exactly the input, delayed by tonechain_latency_frames (the limiter's 20 ms look-ahead); there is no other delay.
 // Same threading and real-time rules as the engine: tonechain_set_tone, tonechain_set_auto_eq and tonechain_process
 // make no memory; tonechain_get_auto_eq may be called from any thread.
 typedef struct ToneChain ToneChain;
