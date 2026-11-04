@@ -61,7 +61,7 @@ final class SoundRing {
 
 // The sound processing, the same for live sound and for files (--render-file). One thread uses it at a time.
 // `process` makes no memory, so it is safe to run on a sound thread.
-final class AdvancedProcessor {
+final class AdvancedProcessor: HearProcessor {
     let sampleRate: Double
     let maxFrames: Int
     private let chain: OpaquePointer
@@ -160,12 +160,15 @@ final class AdvancedPlayer: HearPlayer {
 
     // recordSeconds > 0 (checks only): also keeps what is sent to the speakers, for `saveRecording`.
     // tone: bass and treble in dB (see setTone), autoEQ: Auto EQ (see setAutoEQ), so a rebuilt player keeps them.
+    // heavy: Super Advanced instead of Advanced processing.
     init(device: AudioDeviceID, format: AVAudioFormat, halfSteps: Float, tone: (bass: Double, treble: Double) = (0, 0),
-         autoEQ: (on: Bool, offsets: [Double]) = (false, AdvancedProcessor.noOffsets),
+         autoEQ: (on: Bool, offsets: [Double]) = (false, AdvancedProcessor.noOffsets), heavy: Bool = false,
          input: SoundRing, recordSeconds: Double = 0) throws {
         self.device = device
         self.format = format
-        guard let processor = AdvancedProcessor(sampleRate: format.sampleRate, halfSteps: halfSteps) else {
+        let made: HearProcessor? = heavy ? HeavyProcessor(sampleRate: format.sampleRate, halfSteps: halfSteps)
+            : AdvancedProcessor(sampleRate: format.sampleRate, halfSteps: halfSteps)
+        guard let processor = made else {
             throw Problem(message: "Could not start Advanced processing.")
         }
         processor.setTone(bass: tone.bass, treble: tone.treble)
@@ -254,7 +257,7 @@ struct AdvancedWanted: Equatable {
 
 // The worker thread: waits for grabbed sound, processes it, and hands it to the speakers' ring.
 final class AdvancedWorker {
-    let processor: AdvancedProcessor
+    let processor: HearProcessor
     let input: SoundRing
     let output: SoundRing
     let wanted: OSAllocatedUnfairLock<AdvancedWanted>
@@ -269,7 +272,7 @@ final class AdvancedWorker {
     private let block = 1024
     private let scratch: [UnsafeMutablePointer<Float>]
 
-    init(processor: AdvancedProcessor, input: SoundRing, wanted: AdvancedWanted, recordFrames: Int = 0) {
+    init(processor: HearProcessor, input: SoundRing, wanted: AdvancedWanted, recordFrames: Int = 0) {
         self.processor = processor
         self.input = input
         output = SoundRing(seconds: 2, sampleRate: input.sampleRate)
@@ -336,14 +339,14 @@ final class AdvancedWorker {
     }
 }
 
-// --render-file IN OUT [--steps N] [--advanced] [--steps-at "SECONDS:N,SECONDS:N"] [--tone-db B,T | --tone-amount T]
+// --render-file IN OUT [--steps N] [--advanced | --super] [--steps-at "SECONDS:N,SECONDS:N"] [--tone-db B,T | --tone-amount T]
 //               [--tone-at "SECONDS:T,SECONDS:T"] [--auto-eq] [--eq-offsets a,b,c,d,e]
-// Shifts a sound file offline with the app's own code (normal mode or Advanced processing), for listening
-// samples and checks. The output lines up with the input (the delay is taken out) and has the same length.
+// Shifts a sound file offline with the app's own code (normal mode, Advanced processing or Super Advanced), for
+// listening samples and checks. The output lines up with the input (the delay is taken out) and has the same length.
 // --steps-at changes the amount while it plays, like moving the amount live. --tone-db: Advanced processing's bass
 // and treble in dB; --tone-amount: the Bass ↔ Treble slider (−1 … 1); --tone-at moves the slider while it plays.
 // --auto-eq / --eq-offsets: Advanced processing's Auto EQ on, and its manual offsets in dB (Sub … Air).
-func renderFile(input: String, output: String, halfSteps: Float, advanced: Bool, changes: [(Double, Float)],
+func renderFile(input: String, output: String, halfSteps: Float, advanced: Bool, heavy: Bool = false, changes: [(Double, Float)],
                 tone: (bass: Double, treble: Double) = (0, 0), toneChanges: [(Double, Float)] = [],
                 autoEQ: (on: Bool, offsets: [Double]) = (false, AdvancedProcessor.noOffsets)) throws {
     let file = try AVAudioFile(forReading: URL(fileURLWithPath: input))
@@ -365,9 +368,11 @@ func renderFile(input: String, output: String, halfSteps: Float, advanced: Bool,
         changes.last { Int($0.0 * rate) <= frame }?.1 ?? halfSteps
     }
 
-    if advanced {
+    if advanced || heavy {
         let biggest = ([halfSteps] + changes.map(\.1)).map(abs).max() ?? 0
-        guard let processor = AdvancedProcessor(sampleRate: rate, halfSteps: amount(at: 0), fullRange: biggest > 12) else {
+        let made: HearProcessor? = heavy ? HeavyProcessor(sampleRate: rate, halfSteps: amount(at: 0))
+            : AdvancedProcessor(sampleRate: rate, halfSteps: amount(at: 0), fullRange: biggest > 12)
+        guard let processor = made else {
             throw Problem(message: "Could not start Advanced processing.")
         }
         processor.setTone(bass: tone.bass, treble: tone.treble)
@@ -403,7 +408,10 @@ func renderFile(input: String, output: String, halfSteps: Float, advanced: Bool,
         defer { rubberband_delete(shifter) }
         rubberband_set_max_process_size(shifter, UInt32(block))
         let pad = Int(rubberband_get_preferred_start_pad(shifter))
-        var skip = Int(rubberband_get_start_delay(shifter))
+        // At normal pitch Player skips the shifter and the limiter, so the limiter stays out here too.
+        let limiter = halfSteps != 0 || changes.contains { $0.1 != 0 } ? heavy_limiter_new(rate) : nil
+        defer { if let limiter { heavy_limiter_delete(limiter) } }
+        var skip = Int(rubberband_get_start_delay(shifter)) + (limiter.map { Int(heavy_limiter_latency_frames($0)) } ?? 0)
         var position = -pad, written = 0
         var current = amount(at: 0)
         while written < length {
@@ -428,6 +436,7 @@ func renderFile(input: String, output: String, halfSteps: Float, advanced: Bool,
                         return Int(rubberband_retrieve(shifter, outs, UInt32(want)))
                     }
                 }
+                if let limiter { heavy_limiter_process(limiter, &outL, &outR, Int32(got)) }
                 let drop = min(skip, got)
                 skip -= drop
                 for i in drop..<got where written < length {

@@ -1527,6 +1527,7 @@ final class ShiftCard: NSView {
 
 enum Keys {
     static let hearOn = "hearOn", hearSource = "hearSource", halfSteps = "halfSteps", hearAdvanced = "hearAdvanced"
+    static let hearSuper = "hearSuper"
     static let hideAdvancedAlert = "hideAdvancedAlert"  // "Don't show again" was ticked
     // Advanced processing's Bass ↔ Treble for each speakers or headphones: [device UID: −1 (bass) … 0 … 1 (treble)].
     // Only what was picked on the slider is stored.
@@ -1556,7 +1557,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
     lazy var hear = HearShifter(
         halfSteps: defaults.object(forKey: Keys.halfSteps) as? Float ?? 2,
         source: HearSource(saved: defaults.string(forKey: Keys.hearSource) ?? defaults.string(forKey: "source")),
-        advanced: defaults.bool(forKey: Keys.hearAdvanced),
+        advanced: defaults.bool(forKey: Keys.hearAdvanced), heavy: defaults.bool(forKey: Keys.hearSuper),
         tones: Pro.shared.unlocked ? AppDelegate.savedTones(defaults) : [:],
         autoEQs: Pro.shared.unlocked ? AppDelegate.savedAutoEQs(defaults) : [:])
     lazy var voice = VoiceShifter(
@@ -1698,6 +1699,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
     private var realismApply: DispatchWorkItem?   // a slider move is used once the knob rests (no new chain mid-drag)
     lazy var voiceTools = VoiceTools(app: self)  // the voices button next to the voice picker (VoiceTools.swift)
     let advancedSwitch = GradientSwitch()
+    let superSwitch = GradientSwitch()
     let style = GradientSlider(left: "Natural", right: "Cartoon", name: "Voice style") { value in
         value <= 0 ? "Natural" : value >= 1 ? "Cartoon" : "\(Int((value * 100).rounded())) percent Cartoon"
     }
@@ -1864,7 +1866,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         // Advanced processing (music): keeps the song balanced at big shifts. Turning it on asks first.
         advancedSwitch.onChange = { [weak self] on in self?.advancedPicked(on) }
         hearCard.addRow(ShiftCard.switchRow("Advanced processing", advancedSwitch))
-        // Its tone, Bass ... Treble, kept for each speakers or headphones.
+        // Super Advanced (heavy songs). Free. It and Advanced processing turn each other off.
+        superSwitch.onChange = { [weak self] on in self?.superPicked(on) }
+        hearCard.addRow(ShiftCard.switchRow("Super Advanced", superSwitch))
+        // Advanced processing's tone, Bass ... Treble, kept for each speakers or headphones.
         tone.mark = 0.5
         tone.onChange = { [weak self] value in self?.tonePicked(value) }
         // Locked controls (Pitch Shift Pro) only open the unlock window.
@@ -2024,7 +2029,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
 
         // Tab goes through one card, then the next.
         let autoEQViews: [NSView] = [autoEQSwitch] + autoEQStrip.bands + [autoEQStrip.reset]
-        let hearViews: [NSView] = hearCard.keyViews + [advancedSwitch, tone] + autoEQViews
+        let hearViews: [NSView] = hearCard.keyViews + [advancedSwitch, superSwitch, tone] + autoEQViews
         let voiceViews: [NSView] = voiceCard.keyViews + [style, testButton, slowSwitch, fastSlider, installButton, soundsButton]
         let changerViews: [NSView] = changerCard.keyViews + [strength, realism, secondSwitch, quietSwitch]
         let order: [NSView] = hearViews + voiceViews + changerViews
@@ -2643,9 +2648,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
             askAdvanced()
             return
         }
-        hear.advanced = on
-        defaults.set(on, forKey: Keys.hearAdvanced)
+        setAdvanced(on)
         refresh()  // the tone slider works only with it on
+    }
+
+    private func setAdvanced(_ on: Bool) {
+        hear.mode = on ? .advanced : .normal
+        defaults.set(on, forKey: Keys.hearAdvanced)
+        if on { defaults.set(false, forKey: Keys.hearSuper) }
+    }
+
+    func superPicked(_ on: Bool) {
+        guard preview == nil else { return }  // pictures change nothing
+        hear.mode = on ? .heavy : .normal
+        defaults.set(on, forKey: Keys.hearSuper)
+        if on { defaults.set(false, forKey: Keys.hearAdvanced) }
+        refresh()
     }
 
     // A sheet on the window: Turn On, or Cancel (the switch goes back off and nothing is saved).
@@ -2665,8 +2683,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
             advancedAlert = nil
             if answer == .alertFirstButtonReturn && preview == nil {  // pictures change nothing
                 if alert.suppressionButton?.state == .on { defaults.set(true, forKey: Keys.hideAdvancedAlert) }
-                hear.advanced = true
-                defaults.set(true, forKey: Keys.hearAdvanced)
+                setAdvanced(true)
             }
             refresh()  // shows the switch as it really is (off after Cancel)
         }
@@ -2871,7 +2888,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
             hear.halfSteps = AmountField.clamp(first)  // the two big numbers (--steps 3,-2)
             voice.halfSteps = AmountField.clamp(steps.last ?? first)
         }
-        if preview.contains("tone") { hear.advanced = true }  // Advanced processing on (nothing runs in pictures)
+        if preview.contains("tone") { hear.mode = .advanced }  // Advanced processing on (nothing runs in pictures)
+        if preview.contains("super") { hear.mode = .heavy }  // Super Advanced on
         if let toneArg, !outputUID.isEmpty, pro { hear.setTone(toneArg, for: outputUID) }  // the tone slider (--tone-amount -0.4)
         if preview.contains("slow"), pro { voice.slowDeeper = true }  // "Deeper when slow" on
         if !outputUID.isEmpty {  // Auto EQ on with "eq" (--eq-offsets 3,-2,0,1,-1 sets its sliders), off without
@@ -2980,6 +2998,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         let waiting = preview.map { $0.contains("waiting") } ?? (hear.state == .waiting)
         hearCard.show(on: hearOn, value: hear.halfSteps, active: hearOn, waiting: waiting)
         if advancedAlert == nil { advancedSwitch.isOn = hear.advanced }  // stays on while the alert asks
+        superSwitch.isOn = hear.mode == .heavy
         // Pitch Shift Pro: locked controls show the free version's value, dimmed with a small lock.
         let locked = !Pro.shared.unlocked
         tone.locked = locked

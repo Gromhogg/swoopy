@@ -83,9 +83,10 @@
 //                                              treble in dB; --auto-eq turns on Auto EQ, --eq-offsets gives its five
 //                                              manual offsets in dB, Sub, Bass, Mids, Highs, Air, instead of the saved
 //                                              Auto EQ; --watch also prints its gains and levels while it's in use)
-//   --render-file IN OUT [--steps 5] [--advanced] [--steps-at "4:8,8:-5"] [--tone-amount 0.5] [--tone-at "2:1,4:-1"]
+//   --render-file IN OUT [--steps 5] [--advanced | --super] [--steps-at "4:8,8:-5"] [--tone-amount 0.5] [--tone-at "2:1,4:-1"]
 //                [--tone-db 6,-6] [--auto-eq] [--eq-offsets 0,0,0,0,0]
-//                                              shifts a sound file with the app's own code (normal or advanced)
+//                                              shifts a sound file with the app's own code (normal, Advanced
+//                                              processing or Super Advanced)
 //   --as-free (with any mode above)            as the free version plays it: Bass ↔ Treble in the middle, Auto EQ off,
 //                                              the voice style at Cartoon, Deeper when slow and Higher when fast off,
 //                                              no Voice changer; the options for those are ignored (one note says
@@ -121,7 +122,7 @@ func arg(_ name: String) -> String? {
 // --preview STATES [--size 800x400] [--cartoon-amount 0.5] [--tone-amount -0.4] [--eq-offsets 3,-2,0,1,-1]
 // [--strength 0.6]: show the window in a state for screenshots, without touching any sound or settings, and without
 // switching apps (states: hear-on, voice-on, waiting, typing, recording, playing, listening, hover, menu, roll, resize,
-// no-driver, advanced-alert, sounds, rename, volume, drop, light, tone, slow, eq, changer, changer-man,
+// no-driver, advanced-alert, sounds, rename, volume, drop, light, tone, super, slow, eq, changer, changer-man,
 // changer-realistic, changer-loading, changer-fallback, changer-slider-natural|fast|default|max|NN, changer-intel,
 // changer-second-off, changer-quiet-on, changer-card-off, click-voice, click-vc;
 // --cartoon-amount sets the voice style slider; sounds opens the Soundboard with example names, rename shows the first
@@ -598,7 +599,7 @@ if args.contains("--watch-output") {
 
 if let input = arg("--render-file") {
     let i = args.firstIndex(of: "--render-file")!
-    guard i + 2 < args.count else { print("usage: --render-file IN OUT [--steps N] [--advanced] [--auto-eq] [--eq-offsets a,b,c,d,e]"); exit(1) }
+    guard i + 2 < args.count else { print("usage: --render-file IN OUT [--steps N] [--advanced | --super] [--auto-eq] [--eq-offsets a,b,c,d,e]"); exit(1) }
     // "4:8,8:-5" = at 4 s go to +8, at 8 s go to -5
     let changes: [(Double, Float)] = (arg("--steps-at") ?? "").split(separator: ",").compactMap { item in
         let parts = item.split(separator: ":")
@@ -609,7 +610,7 @@ if let input = arg("--render-file") {
     do {
         // --as-free: Bass ↔ Treble stays in the middle and Auto EQ off, as in the free version.
         try renderFile(input: input, output: args[i + 2], halfSteps: arg("--steps").flatMap(Float.init) ?? 2,
-                       advanced: args.contains("--advanced"), changes: changes,
+                       advanced: args.contains("--advanced"), heavy: args.contains("--super"), changes: changes,
                        tone: asFree ? AdvancedProcessor.toneDb(tilt: Free.tone) : toneDbArg ?? AdvancedProcessor.toneDb(tilt: toneArg ?? 0),
                        toneChanges: asFree ? [] : toneChanges,
                        autoEQ: asFree ? (false, AdvancedProcessor.noOffsets) : autoEQArg)
@@ -713,7 +714,7 @@ if args.contains("--test") {
     // Uses the saved Bass ↔ Treble and Auto EQ for the output, like the app (only read; --tone-amount changes the tone
     // for this test, --auto-eq / --eq-offsets replace the Auto EQ). The free version: none of them, like the window.
     let shifter = HearShifter(halfSteps: arg("--steps").flatMap(Float.init) ?? 2, source: source, advanced: args.contains("--advanced"),
-                              tones: asFree ? [:] : AppDelegate.savedTones(UserDefaults.standard),
+                              heavy: args.contains("--super"), tones: asFree ? [:] : AppDelegate.savedTones(UserDefaults.standard),
                               autoEQs: asFree ? [:] : AppDelegate.savedAutoEQs(UserDefaults.standard))
     shifter.testPID = arg("--pid").flatMap { pid_t($0) }
     shifter.testOutputKey = asFree ? nil : arg("--as-device")

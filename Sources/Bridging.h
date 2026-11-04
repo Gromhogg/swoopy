@@ -3,6 +3,7 @@
 #include <rubberband/rubberband-c.h>
 #include "AudioRing.h"
 #include "Advanced/AdvancedChain.h"
+#include "Heavy/HeavyChain.h"
 #include "Voice/VoiceChanger.h"
 #include "Voice/PulseShifter.h"
 #include "Voice/VoiceModel.h"

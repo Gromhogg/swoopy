@@ -45,6 +45,10 @@ for arch in arm64 x86_64; do
   for f in Sources/Advanced/*.cpp; do
     clang++ -arch $arch -mmacosx-version-min=14.4 -O2 -std=c++17 -Ibuild/libs/include -c "$f" -o "$obj/${f:t:r}.o"
   done
+  # Super Advanced (Mac only, so it stays out of Sources/Advanced, which Windows shares).
+  for f in Sources/Heavy/*.cpp; do
+    clang++ -arch $arch -mmacosx-version-min=14.4 -O2 -std=c++17 -Ibuild/libs/include -c "$f" -o "$obj/${f:t:r}.o"
+  done
   # The voice changer: Natural mode (plain C++) and Realistic mode (Core ML, Objective-C++).
   for f in Sources/Voice/*.cpp; do
     clang++ -arch $arch -mmacosx-version-min=14.4 -O2 -std=c++17 -c "$f" -o "$obj/${f:t:r}.o"

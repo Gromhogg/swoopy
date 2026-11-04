@@ -126,6 +126,7 @@ final class Player: HearPlayer {
     let device: AudioDeviceID
     let format: AVAudioFormat
     private var shifter: RubberBandState?
+    private let limiter: OpaquePointer?  // a shift can push a very loud song well over full scale
     private var halfSteps: Float
     private let startFrames: AVAudioFrameCount
     private let maxFrames: AVAudioFrameCount
@@ -146,6 +147,7 @@ final class Player: HearPlayer {
         let options = Int32(RubberBandOptionProcessRealTime.rawValue | RubberBandOptionEngineFiner.rawValue | RubberBandOptionChannelsTogether.rawValue)
         shifter = rubberband_new(UInt32(format.sampleRate), format.channelCount, options, 1, pow(2, Double(halfSteps) / 12))
         if let shifter { rubberband_set_max_process_size(shifter, 1024) }
+        limiter = heavy_limiter_new(format.sampleRate)
 
         guard useDevice(engine.outputNode.audioUnit!, device) else { throw Problem(message: "Could not play to \(deviceName(device)).") }
         engine.attach(node)
@@ -156,13 +158,17 @@ final class Player: HearPlayer {
     deinit {
         engine.stop()
         if let shifter { rubberband_delete(shifter) }
+        if let limiter { heavy_limiter_delete(limiter) }
     }
 
     func stop() { engine.stop() }
 
     func setHalfSteps(_ value: Float) {
         if let shifter {
-            if halfSteps == 0 && value != 0 { rubberband_reset(shifter) }  // clear out old sound
+            if halfSteps == 0 && value != 0 {  // clear out old sound
+                rubberband_reset(shifter)
+                if let limiter { heavy_limiter_reset(limiter) }
+            }
             rubberband_set_pitch_scale(shifter, pow(2, Double(value) / 12))
         }
         halfSteps = value
@@ -183,6 +189,7 @@ final class Player: HearPlayer {
         guard available > 0, let output = AVAudioPCMBuffer(pcmFormat: buffer.format, frameCapacity: AVAudioFrameCount(available)) else { return nil }
         let outputs: [UnsafeMutablePointer<Float>?] = (0..<channels).map { output.floatChannelData![$0] }
         output.frameLength = rubberband_retrieve(shifter, outputs, UInt32(available))
+        if let limiter, channels > 1 { heavy_limiter_process(limiter, output.floatChannelData![0], output.floatChannelData![1], Int32(output.frameLength)) }
         return output
     }
 
@@ -282,6 +289,11 @@ struct AutoEQSetting: Equatable {
     var engine: (on: Bool, offsets: [Double]) { on ? (true, offsets.map(Double.init)) : (false, AdvancedProcessor.noOffsets) }
 }
 
+// How What you hear shifts: plain (normal mode), Advanced processing, or Super Advanced (made for heavy songs).
+enum HearMode: Equatable {
+    case normal, advanced, heavy
+}
+
 // Keeps a Capture and a Player going, and rebuilds them when the app opens or quits or the speakers change.
 final class HearShifter {
     var halfSteps: Float {
@@ -298,10 +310,12 @@ final class HearShifter {
     var source: HearSource {
         didSet { if oldValue != source { restartCapture() } }
     }
-    // "Advanced processing" (music): keeps the song balanced at big shifts. Switching rebuilds the player.
-    var advanced: Bool {
-        didSet { if oldValue != advanced, running { restartCapture() } }
+    // Switching rebuilds the player. "Advanced processing" (music) keeps the song balanced at big shifts; "Super
+    // Advanced" keeps the notes of heavy songs. One at a time.
+    var mode: HearMode {
+        didSet { if oldValue != mode, running { restartCapture() } }
     }
+    var advanced: Bool { mode == .advanced }
     // Advanced processing's "Bass ↔ Treble" for each speakers or headphones: device UID → tilt, from −1 (more bass)
     // through 0 to +1 (more treble). Normal mode ignores it. A new player (other headphones, or past ±12) starts
     // with the right one.
@@ -356,11 +370,11 @@ final class HearShifter {
     private var running = false
     private var rebuilds: [Date] = []
 
-    init(halfSteps: Float, source: HearSource, advanced: Bool = false, tones: [String: Float] = [:],
+    init(halfSteps: Float, source: HearSource, advanced: Bool = false, heavy: Bool = false, tones: [String: Float] = [:],
          autoEQs: [String: AutoEQSetting] = [:]) {
         self.halfSteps = halfSteps
         self.source = source
-        self.advanced = advanced
+        mode = heavy ? .heavy : advanced ? .advanced : .normal
         self.tones = tones
         self.autoEQs = autoEQs
     }
@@ -494,7 +508,7 @@ final class HearShifter {
             ? CATapDescription(stereoGlobalTapButExcludeProcesses: processes)
             : CATapDescription(stereoMixdownOfProcesses: processes)
         do {
-            capture = try Capture(description, advanced: advanced) { [weak self] buffer in
+            capture = try Capture(description, advanced: mode != .normal) { [weak self] buffer in
                 audioQueue.async { self?.player?.play(buffer) }
             }
             capturedProcesses = processes
@@ -535,7 +549,7 @@ final class HearShifter {
             player?.stop()
             player = nil
             let made: Result<HearPlayer, Error> = Result {
-                if let ring { return try AdvancedPlayer(device: device, format: format, halfSteps: steps, tone: tone, autoEQ: eq, input: ring, recordSeconds: testRecordSeconds) }
+                if let ring { return try AdvancedPlayer(device: device, format: format, halfSteps: steps, tone: tone, autoEQ: eq, heavy: mode == .heavy, input: ring, recordSeconds: testRecordSeconds) }
                 return try Player(device: device, format: format, halfSteps: steps)
             }
             if case .success(let p) = made { player = p }
