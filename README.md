@@ -82,8 +82,8 @@ More help: [windows/README.md](windows/README.md).
 
 **Pitch Shift Pro ($5, Mac)**
 
-- Free: **Output pitch shifter** with Advanced processing, and **Input pitch shifter** in the Cartoon style, with **Test**.
-- Pro adds the **Voice changer** (with your own voices), the **Natural ↔ Cartoon** and **Bass ↔ Treble** sliders, **Auto EQ**, **Deeper when slow** (with **Higher when fast**), **Echo**, **Radio** and the **Soundboard**. They show a small lock until you unlock them.
+- Free: **Output pitch shifter** with Advanced processing, and **Input pitch shifter** in the Cartoon style, with **Echo**, **Radio** and **Test**.
+- Pro adds the **Voice changer** (with your own voices), the **Natural ↔ Cartoon** and **Bass ↔ Treble** sliders, **Auto EQ**, **Deeper when slow** (with **Higher when fast**) and the **Soundboard**. They show a small lock until you unlock them.
 - To get a key, click **Unlock Pro** at the top right, then **Email for a key** (or email cbsweetland@gmail.com). Copy the whole key from the email you get back (it's long, 4 lines; spaces and line breaks don't matter), paste it in and click **Unlock**. It works on all your Macs, for good, with no internet needed. Keys sent out before (25 characters) keep working.
 
 ## Your own voices (Mac)

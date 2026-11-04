@@ -12,8 +12,6 @@ enum Free {
     static let cartoon: Float = 1  // the voice style stays at Cartoon
     static let slowDeeper = false  // Deeper when slow stays off
     static let fastHigher: Float = 0  // and so does Higher when fast
-    static let echo: Float = 0     // Echo and Radio stay off
-    static let radio: Float = 0
     static let tone: Float = 0     // Bass ↔ Treble stays in the middle
     // Auto EQ and the Voice changer stay off.
 }

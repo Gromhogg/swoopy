@@ -1563,8 +1563,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         cartoon: Pro.shared.unlocked ? AppDelegate.savedCartoon(defaults) : Free.cartoon,
         slowDeeper: Pro.shared.unlocked ? defaults.bool(forKey: Keys.voiceSlowDeeper) : Free.slowDeeper,
         fastHigher: Pro.shared.unlocked ? AppDelegate.savedFastHigher(defaults) : Free.fastHigher,
-        echo: Pro.shared.unlocked ? AppDelegate.savedEffect(defaults, Keys.voiceEcho) : Free.echo,
-        radio: Pro.shared.unlocked ? AppDelegate.savedEffect(defaults, Keys.voiceRadio) : Free.radio,
+        echo: AppDelegate.savedEffect(defaults, Keys.voiceEcho),  // Echo and Radio are free
+        radio: AppDelegate.savedEffect(defaults, Keys.voiceRadio),
         micUID: defaults.string(forKey: Keys.voiceMic))
     lazy var test = VoiceTest(voice: voice)
     // Sound effects into Pitch Shift Mic. Pictures show example names and change nothing.
@@ -1882,9 +1882,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         tone.mark = 0.5
         tone.onChange = { [weak self] value in self?.tonePicked(value) }
         // Locked controls (Pitch Shift Pro) only open the unlock window.
-        for slider in [tone, style, strength, realism, fastSlider, echoSlider, radioSlider] {
-            slider.onLockedClick = { [weak self] in self?.showUnlock() }
-        }
+        for slider in [tone, style, strength, realism, fastSlider] { slider.onLockedClick = { [weak self] in self?.showUnlock() } }
         for toggle in [slowSwitch, autoEQSwitch] { toggle.onLockedClick = { [weak self] in self?.showUnlock() } }
         let toneRow = CardRow(views: [tone])
         toneRow.onScale = { [unowned self] scale in
@@ -2163,8 +2161,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
             voice.cartoon = AppDelegate.savedCartoon(defaults)
             voice.slowDeeper = defaults.bool(forKey: Keys.voiceSlowDeeper)
             voice.fastHigher = AppDelegate.savedFastHigher(defaults)
-            voice.echo = AppDelegate.savedEffect(defaults, Keys.voiceEcho)
-            voice.radio = AppDelegate.savedEffect(defaults, Keys.voiceRadio)
             for (uid, tilt) in AppDelegate.savedTones(defaults) { hear.setTone(tilt, for: uid) }
             for (uid, eq) in AppDelegate.savedAutoEQs(defaults) { hear.setAutoEQ(on: eq.on, offsets: eq.offsets, for: uid) }
             restoreChanger()  // the Voice changer as saved; if it's on, it starts (and Your voice goes off)
@@ -2173,8 +2169,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
             voice.cartoon = Free.cartoon
             voice.slowDeeper = Free.slowDeeper
             voice.fastHigher = Free.fastHigher
-            voice.echo = Free.echo
-            voice.radio = Free.radio
             for uid in hear.tones.keys { hear.setTone(Free.tone, for: uid) }
             for uid in hear.autoEQs.keys { hear.setAutoEQ(on: false, offsets: [], for: uid) }
             voice.changer.on = false
@@ -2921,10 +2915,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
             if preview.contains("drop") { soundboard.showDropping() }  // sound files dragged over it
         }
         if let cartoonArg, pro { voice.cartoon = cartoonArg }  // where the style slider is (--cartoon-amount 0.5)
-        if pro {  // where the Echo and Radio sliders are (--echo 0.5 --radio 0.5)
-            voice.echo = echoArg
-            voice.radio = radioArg
-        }
+        voice.echo = echoArg  // where the Echo and Radio sliders are (--echo 0.5 --radio 0.5)
+        voice.radio = radioArg
         if let steps = arg("--steps")?.split(separator: ",").compactMap({ Float($0) }), let first = steps.first {
             hear.halfSteps = AmountField.clamp(first)  // the two big numbers (--steps 3,-2)
             voice.halfSteps = AmountField.clamp(steps.last ?? first)
@@ -3088,11 +3080,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         fastLabel.textColor = fastSlider.isEnabled && !locked ? .secondaryLabelColor : .tertiaryLabelColor
         fastLabel.toolTip = locked ? "Pitch Shift Pro" : nil
         for (slider, label, value) in [(echoSlider, echoLabel, voice.echo), (radioSlider, radioLabel, voice.radio)] {
-            slider.locked = locked
             slider.value = value
             slider.isEnabled = installed
-            label.textColor = installed && !locked ? .secondaryLabelColor : .tertiaryLabelColor
-            label.toolTip = locked ? "Pitch Shift Pro" : nil
+            label.textColor = installed ? .secondaryLabelColor : .tertiaryLabelColor
         }
         soundsButton.isEnabled = installed && hasMic  // the Soundboard works with the voice off too
         if case .problem(let message) = voice.state { voiceCard.amount.toolTip = message } else { voiceCard.amount.toolTip = nil }

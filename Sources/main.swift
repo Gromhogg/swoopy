@@ -90,10 +90,11 @@
 //                [--tone-db 6,-6] [--auto-eq] [--eq-offsets 0,0,0,0,0]
 //                                              shifts a sound file with the app's own code (normal or advanced)
 //   --as-free (with any mode above)            as the free version plays it: Bass ↔ Treble in the middle, Auto EQ off,
-//                                              the voice style at Cartoon, Deeper when slow, Higher when fast, Echo and
-//                                              Radio off, no Voice changer; the options for those are ignored (one note says
-//                                              which), and --render-sounds, --test-sounds (the Soundboard) and
-//                                              --add-voice, --rename-voice, --remove-voice stop with a message.
+//                                              the voice style at Cartoon, Deeper when slow and Higher when fast off,
+//                                              no Voice changer (Echo and Radio are free); the options for those are
+//                                              ignored (one note says which), and --render-sounds, --test-sounds (the
+//                                              Soundboard) and --add-voice, --rename-voice, --remove-voice stop with a
+//                                              message.
 //                                              A copy with Pitch Shift Pro locked always plays this way, like the
 //                                              window ("Pitch Shift Pro is locked: ... ignored (free version)").
 // Pitch Shift Pro (Sources/Pro.swift, notes/paid-unlock-plan.md):
@@ -169,9 +170,9 @@ if asFree {
     if let mode = ["--add-voice", "--rename-voice", "--remove-voice"].first(where: args.contains) {
         print("\(why): your own voices are part of Pitch Shift Pro, so \(mode) doesn't run (free version)."); exit(1)
     }
-    // The Voice changer, Natural ↔ Cartoon, Deeper when slow and Higher when fast, Echo, Radio, Bass ↔ Treble, Auto EQ.
+    // The Voice changer, Natural ↔ Cartoon, Deeper when slow and Higher when fast, Bass ↔ Treble, Auto EQ.
     let paid = ["--voice", "--strength", "--realism", "--quality", "--changer-tune", "--changer-stats", "--block-background",
-                "--cartoon", "--cartoon-amount", "--cartoon-at", "--slow-deeper", "--fast-higher", "--echo", "--radio",
+                "--cartoon", "--cartoon-amount", "--cartoon-at", "--slow-deeper", "--fast-higher",
                 "--tone-db", "--tone-amount", "--tone-at", "--as-device", "--auto-eq", "--eq-offsets"].filter(args.contains)
     if !paid.isEmpty { print("\(why): \(paid.joined(separator: ", ")) ignored (free version).") }
 }
@@ -295,9 +296,9 @@ let slowDeeperArg = asFree ? Free.slowDeeper : slowDeeperAsked && changerArg == 
 // "Higher when fast" with --slow-deeper: --fast-higher N half-steps (0 ... 8; left out = 0, off, as before).
 let fastHigherArg: Float = asFree ? Free.fastHigher
     : slowDeeperArg ? VoiceShifter.cleanFastHigher(arg("--fast-higher").flatMap(Float.init) ?? 0) : 0
-// Echo and Radio: --echo X, --radio X (0 ... 1; left out = 0, off). In --preview they set where the sliders are.
-let echoArg: Float = asFree ? Free.echo : VoiceShifter.cleanEffect(arg("--echo").flatMap(Float.init) ?? 0)
-let radioArg: Float = asFree ? Free.radio : VoiceShifter.cleanEffect(arg("--radio").flatMap(Float.init) ?? 0)
+// Echo and Radio (free): --echo X, --radio X (0 ... 1; left out = 0, off). In --preview they set where the sliders are.
+let echoArg: Float = VoiceShifter.cleanEffect(arg("--echo").flatMap(Float.init) ?? 0)
+let radioArg: Float = VoiceShifter.cleanEffect(arg("--radio").flatMap(Float.init) ?? 0)
 // The amount for the voice: --steps (or `fallback`), except with --voice, where it is not used (the changer sets the
 // pitch; the fallback keeps the renders as they were).
 func voiceStepsArg(_ fallback: Float) -> Float { changerArg != nil ? fallback : arg("--steps").flatMap(Float.init) ?? fallback }
