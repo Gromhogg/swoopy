@@ -6,6 +6,11 @@ the soundboard" are paid; Advanced processing stays free; the voice style stays 
 emailed to them ... the key should cost 5 dollars, and is unlimited access." Later the same evening: one public app,
 gated by the key.
 
+**Changed 2026-11-03 (the owner): Pro = Super Advanced, the Voice changer (AI voices) and the Soundboard; everything
+else is free** (Bass ↔ Treble, Auto EQ, Natural ↔ Cartoon, Deeper when slow / Higher when fast, Echo, Radio, and the
+hotkeys except the Soundboard's sound keys and the Voice changer's key). Bass ↔ Treble and Auto EQ also work without
+Advanced processing now. The table in section 1 is the first version.
+
 Mac only. The Windows (beta) app is not part of this: it stays as it is (everything free) until a Windows unlock is
 built.
 
