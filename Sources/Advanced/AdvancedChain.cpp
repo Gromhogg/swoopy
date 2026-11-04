@@ -1773,3 +1773,97 @@ int advanced_tune(AdvancedChain *chain, const char *key, double v) {
 }
 
 }  // extern "C"
+
+// ------------------------------------------------------------------------------------------------- tone on its own
+
+// Bass / treble and Auto EQ for the app's normal mode (tonechain_*, see AdvancedChain.h): the engine's own AutoEQ5 and
+// ToneStage in the same order, then the same safety limiter, which only works while one of them is in use. With both
+// untouched (the default) the stages are skipped and the limiter's gain stays exactly 1, so the output is the input
+// delayed by the limiter's look-ahead, bit for bit.
+struct ToneChain {
+    double sr = 48000;
+    int nch = 2, SB = 256;
+    int64_t t = 0;                     // samples processed (Auto EQ works in SB blocks, like the engine)
+    AutoEQ5 aeq;
+    ToneStage tone;
+    Limiter lim;
+    std::vector<float> x[MAXCH], ref;  // scratch (made once)
+
+    ToneChain(double rate, int channels) : sr(rate), nch(channels) {
+        SB = rate > 64000 ? 512 : 256;
+        lim.init(sr, nch);
+        lim.setFast(25);               // as the engine's recipe 5
+        tone.init(sr, nch);
+        aeq.init(sr, nch, SB);
+        for (int c = 0; c < nch; c++) x[c].assign(SB, 0.0f);
+        ref.assign(SB, 0.0f);
+    }
+
+    void process(float *const *io, const float *refIn, int frames) {
+        int done = 0;
+        while (done < frames) {
+            int m = (int)std::min<int64_t>(frames - done, SB - (t % SB));
+            bool toneRuns = !(tone.flat() && tone.idle >= tone.idleLimit);
+            lim.enabled = aeq.active() || !tone.flat();
+            if (aeq.active() || toneRuns) {
+                for (int c = 0; c < nch; c++) std::copy(io[c] + done, io[c] + done + m, x[c].begin());
+                if (aeq.active()) {
+                    float *r = ref.data();
+                    if (refIn) std::copy(refIn + done, refIn + done + m, r);
+                    else for (int i = 0; i < m; i++) {  // no original given: the sound itself
+                        float s = 0;
+                        for (int c = 0; c < nch; c++) s += x[c][i];
+                        r[i] = s / nch;
+                    }
+                    aeq.run(x, r, m, (t + m) % SB == 0);
+                }
+                tone.run(x, m);
+                for (int c = 0; c < nch; c++) std::copy(x[c].begin(), x[c].begin() + m, io[c] + done);
+            }
+            for (int i = 0; i < m; i++) {
+                float v[MAXCH];
+                for (int c = 0; c < nch; c++) v[c] = io[c][done + i];
+                lim.run(v);
+                for (int c = 0; c < nch; c++) io[c][done + i] = v[c];
+            }
+            t += m;
+            done += m;
+        }
+    }
+};
+
+extern "C" {
+
+ToneChain *tonechain_new(double sampleRate, int channels) {
+    if (sampleRate < 8000 || sampleRate > 384000 || channels < 1 || channels > MAXCH) return nullptr;
+    return new ToneChain(sampleRate, channels);
+}
+
+void tonechain_delete(ToneChain *chain) { delete chain; }
+
+void tonechain_set_tone(ToneChain *chain, double bassDb, double trebleDb) {
+    ToneStage &s = chain->tone;
+    if (bassDb == bassDb) s.wantB = std::max(-12.0, std::min(12.0, bassDb));  // NaN: unchanged
+    if (trebleDb == trebleDb) s.wantT = std::max(-12.0, std::min(12.0, trebleDb));
+}
+
+void tonechain_set_auto_eq(ToneChain *chain, int on, const double offsetsDb[5]) {
+    AutoEQ5 &a = chain->aeq;
+    a.on = on != 0;
+    for (int k = 0; k < AEQB; k++) {
+        double v = offsetsDb ? offsetsDb[k] : 0.0;
+        a.want[k] = v == v ? std::max(-12.0, std::min(12.0, v)) : 0.0;  // NaN: 0
+    }
+}
+
+void tonechain_get_auto_eq(const ToneChain *chain, double autoDb[5], double levelDb[5]) {
+    chain->aeq.readout.read(autoDb, levelDb);
+}
+
+void tonechain_process(ToneChain *chain, float *const *io, const float *ref, int frames) {
+    if (frames > 0) chain->process(io, ref, frames);
+}
+
+int tonechain_latency_frames(const ToneChain *chain) { return chain->lim.D; }
+
+}  // extern "C"
