@@ -1378,8 +1378,11 @@ final class VoiceShifter {
     private let debounce = Debouncer(0.3)
     private var rebuilds: [Date] = []
     // The speaker's median pitch from the last chain that heard at least a second of voice: the next chain starts
-    // from it instead of the voice's guess (Realistic remakes the chain when the voice changes).
+    // from it instead of the voice's guess (Realistic remakes the chain when the voice changes). 3.6: kept for the next
+    // time the app opens too (not for command-line tests), so a deep voice's first words aren't mapped from the guess.
     private var lastSpeaker: (hz: Float, frames: Float)?
+    private var speakerLoaded = false
+    private static let speakerKey = "voiceChangerSpeaker"
 
     init(halfSteps: Float, cartoon: Float, slowDeeper: Bool = false, fastHigher: Float = 0, micUID: String?) {
         self.halfSteps = halfSteps
@@ -1706,6 +1709,13 @@ final class VoiceShifter {
             stopLater?.cancel()
             stopLater = nil
             if chain == nil {
+                if !speakerLoaded {
+                    speakerLoaded = true
+                    if testSource == nil, lastSpeaker == nil,
+                       let saved = UserDefaults.standard.array(forKey: Self.speakerKey) as? [Double], saved.count == 2 {
+                        lastSpeaker = (Float(saved[0]), Float(saved[1]))
+                    }
+                }
                 do {
                     let ai = realisticKey.map { (id: $0, model: models.model(for: $0), lookaheadMs: changer.lookaheadMs,
                                                  second: changer.second) }
@@ -1743,7 +1753,12 @@ final class VoiceShifter {
     private func closeChain() {
         if let chain {
             let heard = chain.stats.withLock { $0.changer }
-            if heard.learnedFrames >= 100 && heard.medianHz > 0 { lastSpeaker = (heard.medianHz, Float(min(heard.learnedFrames, 100))) }
+            if heard.learnedFrames >= 100 && heard.medianHz > 0 {
+                lastSpeaker = (heard.medianHz, Float(min(heard.learnedFrames, 100)))
+                if testSource == nil {
+                    UserDefaults.standard.set([Double(heard.medianHz), Double(min(heard.learnedFrames, 100))], forKey: Self.speakerKey)
+                }
+            }
         }
         chain?.close()
         chain = nil
