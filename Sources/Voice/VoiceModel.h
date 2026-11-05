@@ -160,30 +160,6 @@ void voicestream_get_stats(const VoiceStream *stream, VoiceStreamStats *out);
 // SoundGate.cpp). This says what was heard as the original so far: short sounds, whistles, and for how long.
 void voicestream_get_passed(const VoiceStream *stream, int64_t *sounds, int64_t *whistles, double *seconds);
 
-// 3.5: a SECOND voice for the sounds that are not speech: hums and hummed tunes, singing, laughs, sighs and breaths
-// (coughs and sneezes too). A voice file of the main voice's shape (the same encoder and inputs; made from the same
-// trained voice, so it is the same person) plus a small sound sorter (YAMNet, Google, Apache-2.0: 521 sound classes
-// from one 0.975 s log-mel patch; SoundSorter.h). Piece by piece the stream makes speech, clicks and anything in
-// doubt with the main voice and the rest with the second one; a switch makes that piece with both and blends over
-// 120 ms ("aiSecondBlendMs"). Speech never changes: it is the main voice, sample for sample.
-// voicemodel_add_second: after voicemodel_load, before the model is given to a stream, off the sound thread. Returns 1
-// if both files load and fit the main voice; else 0 and a reason (the main voice works alone then).
-int voicemodel_add_second(VoiceModel *model, const char *voicePath, const char *sorterPath, char *err, int errSize);
-int voicemodel_has_second(const VoiceModel *model);
-// On (1, the default when the model has one) or off (0: the main voice for everything, 3.4's sound exactly). Any
-// thread; from the next piece. voicestream_tune keys: "aiSecond" (the same), "aiSecondBlendMs" 120, "sv..." (the
-// choice, SoundSorter.cpp).
-void voicestream_set_second(VoiceStream *stream, int on);
-// voicestream_push with the voice changer's tracked pitch and VOICECHANGER_FRAME_* flags for each frame (the choice
-// uses them: a hum or a tune is voiced and note-like).
-void voicestream_push2(VoiceStream *stream, const float *mic, int frames, const float *f0Hz, const int64_t *f0Pos,
-                       const float *f0In, const uint8_t *flags, int n);
-// Pieces made with the second voice, switches between the voices, and pieces made with both (blends) so far.
-void voicestream_get_second(const VoiceStream *stream, int64_t *pieces, int64_t *switches, int64_t *blends);
-// 1 if KEY is one of 3.5's voicestream_tune keys ("aiSecond", "aiSecondBlendMs", "aiSecondBackFrames", "sv..."), so
-// the command line can check --changer-tune before anything starts (any Mac).
-int voicestream_second_key(const char *key);
-
 #ifdef __cplusplus
 }
 #endif

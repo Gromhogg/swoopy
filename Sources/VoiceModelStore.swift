@@ -57,12 +57,11 @@ final class VoiceModelStore {
         if let model { retired.append(model) }  // another voice was loaded: a running chain may still use it
         model = nil
         setStatus(.loading(id))
-        let units = Self.computeUnits, key = Self.preparedKey(entry, quiet: quiet), second = Self.secondFiles(entry)
+        let units = Self.computeUnits, key = Self.preparedKey(entry, quiet: quiet)
         queue.async { [weak self] in
             var err = [CChar](repeating: 0, count: 200)
             let made = voicemodel_load(encoder, voice, units, &err, Int32(err.count))
             let why = String(cString: err)
-            if let made { Self.addSecond(made, second) }
             DispatchQueue.main.async {
                 guard let self else { voicemodel_free(made); return }
                 guard self.wanted == id, self.status == .loading(id) else { voicemodel_free(made); return }  // no longer wanted
@@ -109,23 +108,7 @@ final class VoiceModelStore {
             throw Problem(message: "Realistic mode: \(String(cString: err))")
         }
         UserDefaults.standard.set(true, forKey: preparedKey(entry, quiet: quiet))
-        addSecond(made, secondFiles(entry))
         return made
-    }
-
-    // 3.5: the second voice (hums, laughs, sighs, singing) and the sound sorter, if the voice has them.
-    static func secondFiles(_ entry: VoiceEntry) -> (voice: String, sorter: String)? {
-        guard let voice = entry.soundsURL?.path, let sorter = VoiceLibrary.sorterURL(for: entry)?.path,
-              FileManager.default.fileExists(atPath: voice), FileManager.default.fileExists(atPath: sorter) else { return nil }
-        return (voice, sorter)
-    }
-
-    static func addSecond(_ model: OpaquePointer, _ files: (voice: String, sorter: String)?) {
-        guard let files else { return }
-        var err = [CChar](repeating: 0, count: 200)
-        if voicemodel_add_second(model, files.voice, files.sorter, &err, Int32(err.count)) == 0 {
-            print("Second voice not used: \(String(cString: err))")
-        }
     }
 
     private func setStatus(_ new: Status) {
@@ -159,15 +142,12 @@ func computeUnits(named name: String) -> Int32? {
     }
 }
 
-// Hands the mic sound and the pitch frames voicechanger_analyse just made to the AI voice (sound thread). (3.5: with
-// each frame's tracked pitch and flags, for the choice between the main and the second voice.)
+// Hands the mic sound and the pitch frames voicechanger_analyse just made to the AI voice (sound thread).
 func voicestreamPush(_ stream: OpaquePointer, _ mic: UnsafePointer<Float>, _ frames: Int, _ pitch: UnsafeMutablePointer<VoiceChangerPitch>) {
     let raw = UnsafeMutableRawPointer(pitch)
     let hz = (raw + MemoryLayout<VoiceChangerPitch>.offset(of: \VoiceChangerPitch.frameHz)!).assumingMemoryBound(to: Float.self)
     let pos = (raw + MemoryLayout<VoiceChangerPitch>.offset(of: \VoiceChangerPitch.framePos)!).assumingMemoryBound(to: Int64.self)
-    let f0In = (raw + MemoryLayout<VoiceChangerPitch>.offset(of: \VoiceChangerPitch.frameF0In)!).assumingMemoryBound(to: Float.self)
-    let flags = (raw + MemoryLayout<VoiceChangerPitch>.offset(of: \VoiceChangerPitch.frameFlags)!).assumingMemoryBound(to: UInt8.self)
-    voicestream_push2(stream, mic, Int32(frames), hz, pos, f0In, flags, pitch.pointee.newFrames)
+    voicestream_push(stream, mic, Int32(frames), hz, pos, pitch.pointee.newFrames)
 }
 
 // One line about the AI voice for --watch and --render-voice --quality realistic.
@@ -251,11 +231,6 @@ func renderRealisticFile(input: String, natural: [Float], rate: Double, output: 
     var sounds: Int64 = 0, whistles: Int64 = 0, passed = 0.0
     voicestream_get_passed(stream, &sounds, &whistles, &passed)
     print(String(format: "Other sounds heard as they are (3.4): %lld short sounds, %lld whistles, %.2f s", sounds, whistles, passed))
-    if voicemodel_has_second(model) != 0 {
-        var pieces: Int64 = 0, switches: Int64 = 0, blends: Int64 = 0
-        voicestream_get_second(stream, &pieces, &switches, &blends)
-        print(String(format: "Second voice (3.5): %lld of %lld pieces, %lld switches (%lld blended)", pieces, stats.hops, switches, blends))
-    }
     let aligned = Array(result[min(latency, result.count)..<min(latency + length, result.count)])
     guard let format = AVAudioFormat(standardFormatWithSampleRate: rate, channels: 1),
           let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(max(1, aligned.count))) else {

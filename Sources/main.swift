@@ -38,7 +38,7 @@
 //                                              --changer-stats prints what it does once per second of sound;
 //                                              --changer-tune ai32=0: the AI voice exactly as in 3.1.1, see VoiceModel.h;
 //                                              aiSounds=0: claps, clicks and whistles changed by the AI too, as
-//                                              before 3.4; aiSecond=0: no second voice for laughs and hums;
+//                                              before 3.4;
 //                                              --block-background: "Block background sounds" on, the AI voice's
 //                                              main voice is its quiet version, here and in --test-voice/-button)
 //                [--live-sim [--buffer 128]]   instead: the live chain's steps in callback-sized pieces (with the
@@ -124,7 +124,7 @@ func arg(_ name: String) -> String? {
 // switching apps (states: hear-on, voice-on, waiting, typing, recording, playing, listening, hover, menu, roll, resize,
 // no-driver, advanced-alert, sounds, rename, volume, drop, light, tone, slow, eq, changer, changer-man,
 // changer-realistic, changer-loading, changer-fallback, changer-slider-natural|fast|default|max|NN, changer-intel,
-// changer-second-off, changer-quiet-on, changer-card-off, click-voice, click-vc;
+// changer-quiet-on, changer-card-off, click-voice, click-vc;
 // --cartoon-amount sets the voice style slider; sounds opens the Soundboard with example names, rename shows the first
 // name being changed, volume the first sound's volume slider and drop files being dragged over it; "tone" shows
 // Advanced processing on; --tone-amount sets the Bass ↔ Treble slider; slow turns on "Deeper when slow"; eq turns
@@ -134,7 +134,7 @@ func arg(_ name: String) -> String? {
 // Strength slider, changer-realistic/-loading/-fallback show the AI voice (the slider's default) working/getting
 // ready/standing in with Natural, changer-slider-* puts the "Faster ↔ More real" slider at Natural, the first AI
 // step, the default, the far right or NN percent, changer-intel the card as on an Intel Mac (the slider stays at
-// Natural), changer-second-off / changer-quiet-on the two 3.5 switches off / on, changer-card-off the card with its
+// Natural), changer-quiet-on "Block background sounds" on, changer-card-off the card with its
 // switch off (its settings as given); click-voice / click-vc turn Your voice's / the Voice changer's switch on half
 // a second in, as a click
 // would (the other one goes off); resize drags the window's corner through the three layouts; pro-locked shows
@@ -267,8 +267,7 @@ let changerArg: ChangerOptions? = {
                       "aiHissCross", "aiGainCap", "aiPauseDb", "aiLimit", "aiSlowChip",
                       // 3.4 (VoiceModel.h; "hum34=0" = 3.3's voice changer, VoiceChanger.cpp too)
                       "aiHumLiftDb", "aiHumLevelDb"]  // Realistic mode's test keys (voicestream_tune)
-        let unknown = changerTuneArg.filter { voicechanger_tune(probe, $0.0, $0.1) == 0 && !aiKeys.contains($0.0) && !isVoiceShifterTuneKey($0.0)
-            && voicestream_second_key($0.0) == 0 }.map(\.0)  // (3.5: the second voice's keys)
+        let unknown = changerTuneArg.filter { voicechanger_tune(probe, $0.0, $0.1) == 0 && !aiKeys.contains($0.0) && !isVoiceShifterTuneKey($0.0) }.map(\.0)
         voicechanger_delete(probe)
         let gate = soundgate_new(48000)  // 3.4: "aiSounds" and SoundGate's "sg..." keys
         let stillUnknown = unknown.filter { key in key != "aiSounds" && soundgate_tune(gate, key, changerTuneArg.first { $0.0 == key }?.1 ?? 0) == 0 }

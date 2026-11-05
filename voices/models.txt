@@ -1,5 +1,5 @@
-# The Realistic mode's AI model files (Apple silicon, Core ML, 8-bit weights; ~133 MB zipped, ~146 MB unpacked; 3.5's second
-# voices and sound sorter add ~57 MB zipped, ~65 MB unpacked; 3.5's "Block background sounds" voices ~50 MB / ~58 MB).
+# The Realistic mode's AI model files (Apple silicon, Core ML, 8-bit weights; ~133 MB zipped, ~146 MB unpacked; 3.5's
+# "Block background sounds" voices add ~50 MB / ~58 MB).
 # Too big for git, so build.sh takes them from a local copy (build/voices/, or research/voicechanger/models/ in this
 # checkout or the main one) or downloads them from the address below, checks the SHA-256 sum and unpacks them into
 # Contents/Resources/Voices/. To publish: upload the zips whose address says PLACEHOLDER as assets of a GitHub release
@@ -13,9 +13,8 @@
 # 3.3.0: Woman and Man are trained voices (Kaggle, 200 epochs on 8 VCTK speakers each, started from the blends;
 # research/voicechanger/results/trained.md), converted the same way: woman_us_t200_ahead, man_t200_ahead. New names,
 # so the app's "first time" note and Core ML's cache can't mix them up with the blends. The encoder is unchanged.
-# 3.5: each voice's second voice (hums, hummed tunes, laughs, sighs, breaths, singing; research/voicechanger/results/
-# second_voice.md): the trained voice above, trained 40 more rounds on Kaggle on those sounds (round 3, epoch 40),
-# converted the same way; and the sound sorter that picks between the two (YAMNet + one trained layer, Core ML, 16-bit).
+# 3.5.0 also shipped a second voice per voice for laughs and hums (woman_us_t200_sv3_ahead, man_t200_sv3_ahead) and a
+# sound sorter (sound_sorter); 3.6 left them out (the owner: the AI voice sounded more robotic with them).
 # 3.5: "Block background sounds" (a card switch, off unless turned on): each voice's main voice trained 40 more rounds
 # on Kaggle on the same VCTK speech with room and desk sounds mixed under what it hears, only the part that reads the
 # speech learning (round 4, epoch 40; research/voicechanger/results/trained4.md), converted the same way:
@@ -24,8 +23,5 @@
 contentvec_ahead.mlmodelc.zip  82964437     3566ad71d0625e4f7ac6eb1f77d7d3e9edf946a9ed5a913d4db7feab37354eb5  https://github.com/Gromhogg/pitch-shift/releases/download/v3.1.0/contentvec_ahead.mlmodelc.zip
 woman_us_t200_ahead.mlmodelc.zip  24950963  c714f2328e969d8cf4209b5a20a960b035c091c27061efe4f8e540b28a09476e  https://github.com/Gromhogg/pitch-shift/releases/download/v3.3.0/woman_us_t200_ahead.mlmodelc.zip
 man_t200_ahead.mlmodelc.zip       24953528  5932f2b5c524fd880b445115817255f9a425aca47e408a0060a05f663a34d729  https://github.com/Gromhogg/pitch-shift/releases/download/v3.3.0/man_t200_ahead.mlmodelc.zip
-woman_us_t200_sv3_ahead.mlmodelc.zip  24942611  eeeeb67a3a9f2d9a189485fbae231240a96c1ee951193d8d5b3b047b27ec26df  https://github.com/Gromhogg/pitch-shift/releases/download/v3.5.0/woman_us_t200_sv3_ahead.mlmodelc.zip
-man_t200_sv3_ahead.mlmodelc.zip   24949364  f2e2bcbfe380e637a83fd762acce53125a31c8059263f1b6c9b5d6cacbd68c9f  https://github.com/Gromhogg/pitch-shift/releases/download/v3.5.0/man_t200_sv3_ahead.mlmodelc.zip
-sound_sorter.mlmodelc.zip         6944367   ad3df22dc54bf6d4c41e6ba5e1b4b6f3d7bb5d5c50811927a33da124c81c7fda  https://github.com/Gromhogg/pitch-shift/releases/download/v3.5.0/sound_sorter.mlmodelc.zip
 woman_us_r4_ahead.mlmodelc.zip    24944417  26c6a7f93d669082617ca0e2345096b7f3a116d106a4ff6a41e61f575d4ebec4  https://github.com/Gromhogg/pitch-shift/releases/download/v3.5.0/woman_us_r4_ahead.mlmodelc.zip
 man_r4_ahead.mlmodelc.zip         24947021  fda9fca583df9a9c0ffa9b4f0173706681ac8511b3d923a2c3ddaa3b593fbfef  https://github.com/Gromhogg/pitch-shift/releases/download/v3.5.0/man_r4_ahead.mlmodelc.zip

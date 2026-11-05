@@ -419,7 +419,6 @@ struct VoiceChanger {
     uint8_t singFlag[kSingFlags] = {};
     int singFlagAt = 0, singFlagCount = 0, singFlagSum = 0;
     bool singOn = false;
-    bool noteNow = false;            // 3.5: the newest voiced frame was note-like (for the AI voice's second voice)
     float sing = 0, devSlow = 0;
     // Decisions for post.
     uint8_t flagRing[kFlagFrames] = {};
@@ -557,7 +556,6 @@ struct VoiceChanger {
     // the last singWindow voiced frames were note-like, and speech again below singOffShare. `sing` moves toward it
     // over singGlideFrames.
     void followSinging(float f0) {
-        noteNow = false;
         if (tuning.singMode < 0.5f) { singOn = false; sing = 0; return; }
         const int N = std::clamp((int)tuning.singNoteFrames, 2, kSingNotes);
         const int W = std::clamp((int)tuning.singWindow, 10, kSingFlags);
@@ -577,7 +575,6 @@ struct VoiceChanger {
                 }
                 note = hi - lo < tuning.singNoteSt;
             }
-            noteNow = note;
             if (singFlagCount >= W) singFlagSum -= singFlag[(singFlagAt - W + kSingFlags) % kSingFlags];
             else singFlagCount++;
             singFlag[singFlagAt] = note ? 1 : 0;
@@ -968,10 +965,6 @@ struct VoiceChanger {
             if (out->newFrames < VOICECHANGER_MAX_PITCH_FRAMES) {
                 out->frameHz[out->newFrames] = aiTarget;
                 out->framePos[out->newFrames] = centre;
-                out->frameF0In[out->newFrames] = voiced ? f0 : 0;
-                out->frameFlags[out->newFrames] = (uint8_t)((voiced ? VOICECHANGER_FRAME_VOICED : 0) |
-                    (voiced && noteNow ? VOICECHANGER_FRAME_NOTE : 0) | (singOn ? VOICECHANGER_FRAME_SUNG : 0) |
-                    (heldRules() && held ? VOICECHANGER_FRAME_HELD : 0));
                 out->newFrames++;
             }
         }

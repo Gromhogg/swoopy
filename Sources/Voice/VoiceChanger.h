@@ -43,16 +43,7 @@ typedef struct VoiceChangerPitch {
     int newFrames;         // 10 ms frames finished during this call (0 ... VOICECHANGER_MAX_PITCH_FRAMES)
     float frameHz[VOICECHANGER_MAX_PITCH_FRAMES];     // each new frame's pitch for the AI voice, Hz (0 = not voiced)
     int64_t framePos[VOICECHANGER_MAX_PITCH_FRAMES];  // each new frame's centre, in input samples since the last reset
-    // (3.5) for the AI voice's choice between its main and its second voice (VoiceModel.h): each new frame's tracked
-    // pitch (Hz, 0 = not voiced) and VOICECHANGER_FRAME_* flags
-    float frameF0In[VOICECHANGER_MAX_PITCH_FRAMES];
-    uint8_t frameFlags[VOICECHANGER_MAX_PITCH_FRAMES];
 } VoiceChangerPitch;
-
-#define VOICECHANGER_FRAME_VOICED 1  // the tracker found a pitch
-#define VOICECHANGER_FRAME_NOTE 2    // note-like: the last singNoteFrames voiced frames stay within singNoteSt
-#define VOICECHANGER_FRAME_SUNG 4    // inside a sung passage (singOn)
-#define VOICECHANGER_FRAME_HELD 8    // a held note
 
 // For --changer-stats and the window.
 typedef struct VoiceChangerStats {

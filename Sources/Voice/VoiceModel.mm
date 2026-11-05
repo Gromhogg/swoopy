@@ -47,8 +47,6 @@
 //   margin_ms on newer files; + right_ms, max_ahead_ms, pick_frames in the look-ahead shape).
 #include "VoiceModel.h"
 #include "SoundGate.h"
-#include "SoundSorter.h"
-#include "VoiceChanger.h"
 
 #include <cstdio>
 #include <cstring>
@@ -291,12 +289,6 @@ struct VoiceModel {
     int maxAheadMs = 0;            // ... the most look-ahead it can use
     double loadMs = 0, warmMs = 0, probeHopMs = 0;
     std::string describe;
-    // 3.5 (voicemodel_add_second): the second voice (same shape, same encoder) and its CPU copy, and the sound sorter
-    MLModel *voice2 = nil;
-    MLModel *voice2CPU = nil;
-    MLModel *sorter = nil;
-    bool sorterHead = false;       // ... the sorter file also has the small "classes" head
-    double secondHopMs = 0, sorterMs = 0, secondLoadMs = 0;
 };
 
 namespace {
@@ -316,11 +308,6 @@ struct Runner {
     std::vector<float> prevTail;      // research trace only
     std::vector<float> limH, limHist; // 3.2 peak limiter: the gain each sample needs (min over 5 ms ahead), last ones
     std::vector<int> limQ;            // ... its sliding-minimum queue
-    // 3.5: the second voice's output (only filled when a switch makes both voices) and the sound sorter's input/output
-    Buffer audioOut2, mel, scores, classes;
-    MLPredictionOptions *voiceOptions2 = nil, *sorterOptions = nil;
-    id<MLFeatureProvider> sorterIn = nil;
-    std::vector<float> win16;         // the sorter's 0.975 s of 16 kHz sound
 };
 
 bool predict(MLModel *m, id<MLFeatureProvider> in, MLPredictionOptions *opt, NSString *outName, Buffer &out) {
@@ -362,25 +349,6 @@ bool makeRunner(VoiceModel *m, Runner &r) {
     r.encoderOptions.outputBackings = @{@"features" : r.features.array};
     r.voiceOptions = [MLPredictionOptions new];
     r.voiceOptions.outputBackings = @{@"audio" : r.audioOut.array};
-    if (m->voice2) {  // 3.5: the second voice writes here when both are made (a switch)
-        if (!r.audioOut2.make(@[@1, @(m->decSamples)], MLMultiArrayDataTypeFloat32)) return false;
-        r.voiceOptions2 = [MLPredictionOptions new];
-        r.voiceOptions2.outputBackings = @{@"audio" : r.audioOut2.array};
-    }
-    if (m->sorter) {
-        if (!r.mel.make(@[@1, @1, @(soundsorter::kFrames), @(soundsorter::kBands)], MLMultiArrayDataTypeFloat32)) return false;
-        if (!r.scores.make(@[@1, @(soundsorter::kClasses)], MLMultiArrayDataTypeFloat32)) return false;
-        r.sorterIn = [[MLDictionaryFeatureProvider alloc] initWithDictionary:@{@"logmel" : [MLFeatureValue featureValueWithMultiArray:r.mel.array]} error:&why];
-        if (!r.sorterIn) return false;
-        r.sorterOptions = [MLPredictionOptions new];
-        if (m->sorterHead) {
-            if (!r.classes.make(@[@1, @(soundsorter::kHead)], MLMultiArrayDataTypeFloat32)) return false;
-            r.sorterOptions.outputBackings = @{@"scores" : r.scores.array, @"classes" : r.classes.array};
-        } else {
-            r.sorterOptions.outputBackings = @{@"scores" : r.scores.array};
-        }
-        r.win16.assign(soundsorter::kWindow, 0.0f);
-    }
     Gauss g(1234);
     r.sourceNoise.resize(kSourceNoise);
     for (auto &v : r.sourceNoise) v = g.next();
@@ -426,8 +394,6 @@ struct VoiceStream {
     std::atomic<int64_t> inEnd{0};
     std::vector<int64_t> pitchPos;
     std::vector<float> pitchHz;
-    std::vector<float> pitchF0In;      // 3.5: the tracked pitch of each frame (Hz, 0 = not voiced) ...
-    std::vector<uint8_t> pitchFlags;   // ... and its VOICECHANGER_FRAME_* flags (for the second voice's choice)
     std::atomic<int64_t> pitchEnd{0};
     std::atomic<int64_t> wakeAt{0};
 
@@ -540,16 +506,6 @@ struct VoiceStream {
     std::atomic<float> humLevelDb{-20}; // humLevelDb, by at most this much (the trained voices lose the tone of a
                                         // long, quiet hum); speech is never steady enough, so it is not changed
     FILE *trace = nullptr;              // research: per-piece trace (offline only, PITCHSHIFT_AI_TRACE)
-    // 3.5: the second voice (hums, tunes, laughs, sighs, breaths, singing), piece by piece (SoundSorter.h)
-    std::atomic<int> secondOn{1};       // "aiSecond" 1 [0: the main voice only, 3.4's sound exactly]
-    std::atomic<int> blendMs{120};      // "aiSecondBlendMs": a switch makes both voices for that piece and blends
-                                        // from the old one into the new over this long (0: only the usual 40 ms join)
-    std::atomic<int> rangeFrames{40};   // "aiSecondBackFrames": pitch frames before the piece the choice looks at
-    soundsorter::LogMel *logmel = nullptr;
-    soundsorter::Rule rule;             // (worker thread; tune keys "sv..." are set before the sound starts)
-    int voiceNow = 1;                   // 1 = the main voice made the last piece, 2 = the second
-    std::atomic<int64_t> secondHops{0}, secondSwitches{0}, blendHops{0};
-    FILE *svTrace = nullptr;            // research: the choice per piece (offline only, PITCHSHIFT_SV_TRACE)
     // 3.4: sounds that are not a voice (claps, clicks, whistles) are heard as the original mic sound (SoundGate.h)
     SoundGate *gate = nullptr;
     std::atomic<int> gateOn{1};         // "aiSounds" 1 [0: the AI voice for every sound, as before 3.4]
@@ -858,35 +814,7 @@ struct VoiceStream {
             const size_t keep = r.voiceFeatures.count, skip = r.features.count - keep;
             std::memcpy(r.voiceFeatures.f(), r.features.f() + skip, sizeof(float) * keep);
         }
-        // 3.5: the main voice, or the second one for hums, tunes, laughs, sighs ... (a switch makes both and blends)
-        const int which = chooseVoice(E, A, r);
-        MLModel *main = onCPU && m.voiceCPU ? m.voiceCPU : m.voice;
-        if (which == voiceNow || !m.voice2) {
-            MLModel *g = which == 2 && m.voice2 ? (onCPU && m.voice2CPU ? m.voice2CPU : m.voice2) : main;
-            if (!predict(g, r.voiceIn, r.voiceOptions, @"audio", r.audioOut)) return false;
-        } else {
-            MLModel *second = onCPU && m.voice2CPU ? m.voice2CPU : m.voice2;
-            const int blendN = hops.load() > 0 ? std::clamp(blendMs.load(), 0, H * 10) * upp / 10 : 0;
-            if (blendN > 0) {  // both: the old voice into the new one, from where this piece's sound starts
-                if (!predict(main, r.voiceIn, r.voiceOptions, @"audio", r.audioOut)) return false;
-                if (!predict(second, r.voiceIn, r.voiceOptions2, @"audio", r.audioOut2)) return false;
-                float *a = r.audioOut.f();
-                const float *b = r.audioOut2.f();
-                const int n = (int)r.audioOut.count, start = M * upp;
-                for (int i = 0; i < n; i++) {
-                    double w = std::clamp((double)(i - start) / blendN, 0.0, 1.0);  // the new voice's share
-                    w = 0.5 - 0.5 * std::cos(M_PI * w);
-                    if (which == 1) w = 1 - w;  // (a holds the main voice, b the second)
-                    a[i] = (float)((1 - w) * a[i] + w * b[i]);
-                }
-                blendHops.fetch_add(1);
-            } else if (!predict(which == 2 ? second : main, r.voiceIn, r.voiceOptions, @"audio", r.audioOut)) {
-                return false;
-            }
-            secondSwitches.fetch_add(1);
-            voiceNow = which;
-        }
-        if (which == 2) secondHops.fetch_add(1);
+        if (!predict(onCPU && m.voiceCPU ? m.voiceCPU : m.voice, r.voiceIn, r.voiceOptions, @"audio", r.audioOut)) return false;
         const int slow = slowMs.load();
         if (slow > 0 && slowEvery.load() > 0 && (hop % slowEvery.load()) == 0 && !(slowChip.load() && onCPU))
             usleep((useconds_t)slow * 1000);
@@ -1083,72 +1011,6 @@ struct VoiceStream {
         onCPUShown.store(onCPU ? 1 : 0, std::memory_order_relaxed);
     }
 
-    // 3.5: which voice makes the piece at frames [A, A + H) (window end E): 1 = the main voice, 2 = the second one
-    // (SoundSorter.h). Without a second voice, or with it turned off: 1 (and nothing else runs).
-    int chooseVoice(int64_t E, int64_t A, Runner &r) {
-        VoiceModel &m = *r.model;
-        if (!m.voice2 || !secondOn.load()) return 1;
-        soundsorter::Features f;
-        if (m.sorter && logmel && !r.win16.empty()) {  // the sound classes of the 0.975 s up to the newest sound
-            in16.get(E * kFrame16 - soundsorter::kWindow, r.win16.data(), soundsorter::kWindow, 0);
-            f.loudDb = logmel->run(r.win16.data(), r.mel.f());
-            if (sortSound(m, r)) {
-                soundsorter::groupScores(r.scores.f(), f.group);
-                if (m.sorterHead) {
-                    f.hasHead = true;
-                    for (int k = 0; k < soundsorter::kHead; k++) f.head[k] = r.classes.f()[k];
-                }
-            }
-        }
-        f.floorDb = floorDb;
-        // the pitch frames from rangeFrames before the piece to the newest (chain-sample positions)
-        const double toChain16 = rate / kRate16;
-        const double from = (double)(A - rangeFrames.load()) * kFrame16 * toChain16;
-        const int64_t pend = pitchEnd.load(std::memory_order_acquire);
-        float st[256];
-        int nst = 0;
-        for (int64_t k = pend - 1; k >= std::max<int64_t>(0, pend - kPitchSlots + 8); k--) {
-            const size_t slot = (size_t)(k % kPitchSlots);
-            if ((double)pitchPos[slot] < from) break;
-            const uint8_t fl = pitchFlags[slot];
-            f.frames++;
-            if (fl & VOICECHANGER_FRAME_VOICED) {
-                f.voiced++;
-                if (nst < 256 && pitchF0In[slot] > 0) st[nst++] = 12 * std::log2(pitchF0In[slot] / 100.0f);
-            }
-            if (fl & VOICECHANGER_FRAME_NOTE) f.note++;
-            if (fl & VOICECHANGER_FRAME_SUNG) f.sung++;
-        }
-        if (nst >= 10) {
-            std::sort(st, st + nst);
-            f.rangeSt = st[nst * 9 / 10] - st[nst / 10];
-        }
-        const char *why = nullptr;
-        const int on = rule.decide(f, &why);
-        if (svTrace) {
-            if (f.hasHead) {
-            std::fprintf(svTrace, "svh");
-            for (int k = 0; k < soundsorter::kHead; k++) std::fprintf(svTrace, " %.3f", f.head[k]);
-            std::fprintf(svTrace, "\n");
-        }
-        std::fprintf(svTrace, "sv hop %lld A %lld E %lld loud %.1f floor %.1f frames %d voiced %d note %d sung %d range %.1f |",
-                         (long long)hop, (long long)A, (long long)E, f.loudDb, f.floorDb, f.frames, f.voiced, f.note, f.sung, f.rangeSt);
-            for (int g = 0; g < soundsorter::kGroups; g++) std::fprintf(svTrace, " %s %.3f", soundsorter::groupName(g), f.group[g]);
-            std::fprintf(svTrace, " | %s -> %d\n", why ? why : "", on);
-        }
-        return on ? 2 : 1;
-    }
-
-    // 3.5: the sound sorter on the patch in r.mel: its 521 scores (and the head's classes) into r.scores (r.classes).
-    static bool sortSound(VoiceModel &m, Runner &r) {
-        @autoreleasepool {
-            NSError *why = nil;
-            id<MLFeatureProvider> o = [m.sorter predictionFromFeatures:r.sorterIn options:r.sorterOptions error:&why];
-            if (!o || !r.scores.take([o featureValueForName:@"scores"].multiArrayValue)) return false;
-            return !m.sorterHead || r.classes.take([o featureValueForName:@"classes"].multiArrayValue);
-        }
-    }
-
     // 3.4 (aiHumLiftDb, aiHumLevelDb): the trained voices lose the tone of a long, quiet hum (they waver, drop an
     // octave or whisper), less so when it is louder. When the sound around this piece (+-0.4 s of known frames) is a
     // steady note - at least 30 voiced frames, 80 % of them within 0.75 half-steps of their median - the speech reader
@@ -1296,8 +1158,6 @@ struct VoiceStream {
         lastO = 0;
         limG = 1;
         liftDb = 0;
-        voiceNow = 1;  // 3.5
-        rule.reset();
         phaseAt = INT64_MIN;
         laNow = std::clamp(laNow, 0, maxAhead());
         onCPU = startChip.load() && m->voiceCPU;
@@ -1371,7 +1231,7 @@ struct VoiceStream {
     }
 
     // -------------------------------------------------------------------------------------- sound thread side
-    void push(const float *mic, int frames, const float *f0Hz, const int64_t *f0Pos, const float *f0In, const uint8_t *flags, int n) {
+    void push(const float *mic, int frames, const float *f0Hz, const int64_t *f0Pos, int n) {
         int64_t end = inEnd.load(std::memory_order_relaxed);
         if (mic) in.put(end, mic, frames);
         else for (int i = 0; i < frames; i++) in.buf[(size_t)((end + i) & in.mask)] = 0;
@@ -1380,8 +1240,6 @@ struct VoiceStream {
         for (int k = 0; k < n && f0Hz && f0Pos; k++) {
             pitchPos[(size_t)(pe % kPitchSlots)] = f0Pos[k];
             pitchHz[(size_t)(pe % kPitchSlots)] = f0Hz[k];
-            pitchF0In[(size_t)(pe % kPitchSlots)] = f0In ? f0In[k] : 0.0f;
-            pitchFlags[(size_t)(pe % kPitchSlots)] = flags ? flags[k] : 0;
             pe++;
         }
         pitchEnd.store(pe, std::memory_order_release);
@@ -1652,74 +1510,6 @@ VoiceModel *voicemodel_load(const char *encoderPath, const char *voicePath, int 
 
 void voicemodel_free(VoiceModel *model) { delete model; }
 
-int voicemodel_add_second(VoiceModel *m, const char *voicePath, const char *sorterPath, char *err, int errSize) {
-    if (!m || !voicePath || !sorterPath) { say(err, errSize, "no second voice files"); return 0; }
-    @autoreleasepool {
-        const double t0 = nowMs();
-        auto open = [&](const char *path, int units) -> MLModel * {
-            MLModelConfiguration *cfg = [MLModelConfiguration new];
-            cfg.computeUnits = unitsFor(units);
-            NSError *why = nil;
-            return [MLModel modelWithContentsOfURL:[NSURL fileURLWithPath:[NSString stringWithUTF8String:path]] configuration:cfg error:&why];
-        };
-        MLModel *v2 = open(voicePath, m->unitsVoice);
-        MLModel *sorter = open(sorterPath, VOICEMODEL_COMPUTE_CPU);  // small: the CPU is quick and never busy with a game
-        if (!v2 || !sorter) { say(err, errSize, "the second voice's files can't be opened"); return 0; }
-        // the same shape as the main voice (it is fed the same inputs) ...
-        MLModelDescription *a = m->voice.modelDescription, *b = v2.modelDescription;
-        for (NSString *name in a.inputDescriptionsByName) {
-            MLFeatureDescription *x = a.inputDescriptionsByName[name], *y = b.inputDescriptionsByName[name];
-            if (!y || ![x.multiArrayConstraint.shape isEqualToArray:y.multiArrayConstraint.shape] ||
-                x.multiArrayConstraint.dataType != y.multiArrayConstraint.dataType) {
-                say(err, errSize, "the second voice doesn't fit the main one"); return 0;
-            }
-        }
-        if (b.inputDescriptionsByName.count != a.inputDescriptionsByName.count ||
-            ![a.outputDescriptionsByName[@"audio"].multiArrayConstraint.shape isEqualToArray:b.outputDescriptionsByName[@"audio"].multiArrayConstraint.shape]) {
-            say(err, errSize, "the second voice doesn't fit the main one"); return 0;
-        }
-        NSDictionary *ma = a.metadata[MLModelCreatorDefinedKey], *mb = b.metadata[MLModelCreatorDefinedKey];
-        for (NSString *key in @[@"rate", @"upp", @"hop_ms", @"dec_frames", @"xfade_ms", @"sola_ms", @"margin_ms", @"right_ms", @"max_ahead_ms"]) {
-            if (metaInt(ma, key, -1) != metaInt(mb, key, -1)) { say(err, errSize, "the second voice doesn't fit the main one"); return 0; }
-        }
-        // ... and the sorter takes one log-mel patch and gives the 521 sound classes
-        MLModelDescription *sd = sorter.modelDescription;
-        NSArray<NSNumber *> *si = sd.inputDescriptionsByName[@"logmel"].multiArrayConstraint.shape;
-        NSArray<NSNumber *> *so = sd.outputDescriptionsByName[@"scores"].multiArrayConstraint.shape;
-        if (si.count != 4 || si[2].intValue != soundsorter::kFrames || si[3].intValue != soundsorter::kBands ||
-            so.count != 2 || so[1].intValue != soundsorter::kClasses) {
-            say(err, errSize, "the sound sorter's file has unexpected sizes"); return 0;
-        }
-        NSArray<NSNumber *> *sh = sd.outputDescriptionsByName[@"classes"].multiArrayConstraint.shape;
-        m->sorterHead = sh.count == 2 && sh[1].intValue == soundsorter::kHead;
-        m->voice2 = v2;
-        if (m->voiceCPU) m->voice2CPU = open(voicePath, VOICEMODEL_COMPUTE_CPU);
-        m->sorter = sorter;
-        m->secondLoadMs = nowMs() - t0;
-        // warm up (macOS prepares the models on the first calls) and time them
-        Runner r;
-        if (!makeRunner(m, r)) { m->voice2 = m->voice2CPU = m->sorter = nil; m->sorterHead = false; say(err, errSize, "out of memory"); return 0; }
-        bool ok = true;
-        for (int k = 0; k < 2 && ok; k++) ok = predict(m->voice2, r.voiceIn, r.voiceOptions, @"audio", r.audioOut) &&
-                                               VoiceStream::sortSound(*m, r);
-        if (ok && m->voice2CPU) for (int k = 0; k < 2 && ok; k++) ok = predict(m->voice2CPU, r.voiceIn, r.voiceOptions, @"audio", r.audioOut);
-        if (!ok) { m->voice2 = m->voice2CPU = m->sorter = nil; m->sorterHead = false; say(err, errSize, "the second voice doesn't run"); return 0; }
-        double t1 = nowMs();
-        for (int k = 0; k < 3; k++) predict(m->voice2, r.voiceIn, r.voiceOptions, @"audio", r.audioOut);
-        m->secondHopMs = (nowMs() - t1) / 3;
-        t1 = nowMs();
-        for (int k = 0; k < 3; k++) VoiceStream::sortSound(*m, r);
-        m->sorterMs = (nowMs() - t1) / 3;
-        char buf[160];
-        std::snprintf(buf, sizeof buf, "; second voice ready (%.0f ms, sorter %.1f ms; %.1f s)", m->secondHopMs, m->sorterMs,
-                      (nowMs() - t0) / 1000);
-        m->describe += buf;
-        return 1;
-    }
-}
-
-int voicemodel_has_second(const VoiceModel *model) { return model && model->voice2 && model->sorter ? 1 : 0; }
-
 const char *voicemodel_describe(const VoiceModel *model) { return model ? model->describe.c_str() : ""; }
 
 int voicemodel_max_lookahead_ms(const VoiceModel *model) { return model ? model->maxAheadMs : 0; }
@@ -1765,7 +1555,6 @@ VoiceStream *voicestream_new(VoiceModel *model, double chainRate, int maxFrames,
     s->natural.init(s->latencyFor(100) + 4 * (int64_t)maxFrames + 64);  // room for any look-ahead (up to 1 s)
     if (s->offline) {
         if (const char *path = getenv("PITCHSHIFT_AI_TRACE")) s->trace = std::fopen(path, "w");
-        if (const char *path = getenv("PITCHSHIFT_SV_TRACE")) s->svTrace = std::fopen(path, "w");
     }
     s->in16.init((int64_t)kRate16 * 8);
     s->gate = soundgate_new(chainRate);
@@ -1773,9 +1562,6 @@ VoiceStream *voicestream_new(VoiceModel *model, double chainRate, int maxFrames,
     if (s->gate) { s->gateFit = s->playLatency; soundgate_fit(s->gate, s->playLatency - maxFrames); }
     s->pitchPos.assign(kPitchSlots, 0);
     s->pitchHz.assign(kPitchSlots, 0.0f);
-    s->pitchF0In.assign(kPitchSlots, 0.0f);
-    s->pitchFlags.assign(kPitchSlots, 0);
-    s->logmel = new soundsorter::LogMel();
     s->scratch.assign(8192, 0.0f);
     if (!s->toModel.init(kRate16 / chainRate, 8192)) { delete s; return nullptr; }
     s->wake = dispatch_semaphore_create(0);
@@ -1814,8 +1600,6 @@ void voicestream_delete(VoiceStream *stream) {
         pthread_join(stream->thread, nullptr);
     }
     if (stream->trace) std::fclose(stream->trace);
-    if (stream->svTrace) std::fclose(stream->svTrace);
-    delete stream->logmel;
     soundgate_delete(stream->gate);
     delete stream->run;
     delete stream;
@@ -1839,22 +1623,7 @@ void voicestream_set_intonation(VoiceStream *stream, float intonation) {
 }
 
 void voicestream_push(VoiceStream *stream, const float *mic, int frames, const float *f0Hz, const int64_t *f0Pos, int n) {
-    if (stream && frames > 0) stream->push(mic, frames, f0Hz, f0Pos, nullptr, nullptr, n);
-}
-
-void voicestream_push2(VoiceStream *stream, const float *mic, int frames, const float *f0Hz, const int64_t *f0Pos,
-                       const float *f0In, const uint8_t *flags, int n) {
-    if (stream && frames > 0) stream->push(mic, frames, f0Hz, f0Pos, f0In, flags, n);
-}
-
-void voicestream_set_second(VoiceStream *stream, int on) {
-    if (stream) stream->secondOn.store(on != 0);
-}
-
-void voicestream_get_second(const VoiceStream *stream, int64_t *pieces, int64_t *switches, int64_t *blends) {
-    if (pieces) *pieces = stream ? stream->secondHops.load() : 0;
-    if (switches) *switches = stream ? stream->secondSwitches.load() : 0;
-    if (blends) *blends = stream ? stream->blendHops.load() : 0;
+    if (stream && frames > 0) stream->push(mic, frames, f0Hz, f0Pos, n);
 }
 
 void voicestream_pull(VoiceStream *stream, const float *naturalNow, int naturalDelay, float *out, int frames) {
@@ -1896,7 +1665,6 @@ int voicestream_tune(VoiceStream *stream, const char *key, float value) {
         stream->gapFrames.store(on ? 5 : 8); stream->shortRunMs.store(on ? 40 : 0); stream->hissCross.store(on ? 0.3f : 0);
         stream->gainCap.store(on); stream->gainMs.store(on ? 120 : 50); stream->limitAt.store(on ? 0.6f : 0);
         stream->gateOn.store(on);  // (3.4's pass-through of other sounds too, so that 0 is 3.1.1's sound exactly)
-        stream->secondOn.store(on);  // (and 3.5's second voice)
         stream->resplit();
         return 1;
     }
@@ -1917,11 +1685,6 @@ int voicestream_tune(VoiceStream *stream, const char *key, float value) {
     if (k == "aiGainCap") { stream->gainCap.store(value != 0); return 1; }
     if (k == "aiPauseDb") { stream->pauseDb.store(std::clamp(value, -60.0f, 0.0f)); return 1; }
     if (k == "aiLimit") { stream->limitAt.store(std::clamp(value, 0.0f, 1.0f)); return 1; }
-    // 3.5: the second voice
-    if (k == "aiSecond") { stream->secondOn.store(value != 0); return 1; }
-    if (k == "aiSecondBlendMs") { stream->blendMs.store(std::clamp((int)value, 0, 160)); return 1; }
-    if (k == "aiSecondBackFrames") { stream->rangeFrames.store(std::clamp((int)value, 0, 100)); return 1; }
-    if (k.rfind("sv", 0) == 0) return stream->rule.tune(k, value) ? 1 : 0;
     // 3.4
     if (k == "hum34") { stream->humLiftDb.store(value != 0 ? 24 : 0); return 1; }  // 0: as 3.3 (with VoiceChanger's)
     if (k == "aiHumLiftDb") { stream->humLiftDb.store(std::clamp(value, 0.0f, 40.0f)); return 1; }
@@ -1973,11 +1736,6 @@ VoiceModel *voicemodel_load(const char *, const char *, int, char *err, int errS
 }
 
 void voicemodel_free(VoiceModel *) {}
-int voicemodel_add_second(VoiceModel *, const char *, const char *, char *err, int errSize) {
-    say(err, errSize, "needs Apple silicon");
-    return 0;
-}
-int voicemodel_has_second(const VoiceModel *) { return 0; }
 const char *voicemodel_describe(const VoiceModel *) { return ""; }
 VoiceStream *voicestream_new(VoiceModel *, double, int, int, const VoiceStreamConfig *) { return nullptr; }
 int voicestream_set_model(VoiceStream *, VoiceModel *) { return 0; }
@@ -1988,13 +1746,6 @@ double voicestream_delay_ms(const VoiceModel *, double, int, int) { return 0; }
 void voicestream_set_lookahead(VoiceStream *, int) {}
 void voicestream_set_intonation(VoiceStream *, float) {}
 void voicestream_push(VoiceStream *, const float *, int, const float *, const int64_t *, int) {}
-void voicestream_push2(VoiceStream *, const float *, int, const float *, const int64_t *, const float *, const uint8_t *, int) {}
-void voicestream_set_second(VoiceStream *, int) {}
-void voicestream_get_second(const VoiceStream *, int64_t *pieces, int64_t *switches, int64_t *blends) {
-    if (pieces) *pieces = 0;
-    if (switches) *switches = 0;
-    if (blends) *blends = 0;
-}
 
 void voicestream_pull(VoiceStream *, const float *naturalNow, int, float *out, int frames) {
     if (out && naturalNow && out != naturalNow && frames > 0) std::memcpy(out, naturalNow, sizeof(float) * (size_t)frames);
@@ -2015,12 +1766,3 @@ void voicestream_get_passed(const VoiceStream *, int64_t *sounds, int64_t *whist
 }  // extern "C"
 
 #endif
-
-// 3.5: the second voice's tune keys (both chips: the command line checks its keys before anything starts).
-extern "C" int voicestream_second_key(const char *key) {
-    if (!key) return 0;
-    const std::string k = key;
-    if (k == "aiSecond" || k == "aiSecondBlendMs" || k == "aiSecondBackFrames") return 1;
-    soundsorter::Rule probe;
-    return k.rfind("sv", 0) == 0 && probe.tune(k, 0) ? 1 : 0;
-}
