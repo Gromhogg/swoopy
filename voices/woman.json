@@ -5,7 +5,7 @@
   "natural": {
     "targetHz": 235,
     "assumedInputHz": 120,
-    "intonation": 1.7,
+    "intonation": 1.0,
     "formant": 1.21,
     "breathDb": -30,
     "presenceDb": 2.5,
