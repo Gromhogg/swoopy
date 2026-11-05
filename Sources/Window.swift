@@ -3068,12 +3068,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         let chosen = VoiceLibrary.shared.voice(voice.changer.voiceID)
         let hasRealistic = chosen?.manifest.realistic != nil
         // In Realistic mode the AI voice always sounds like the voice; the slider only moves the pitch, from yours
-        // (left) to the voice's (right), so it says so.
+        // (left) to the AI voice's (right).
         if voice.changer.realistic && hasRealistic && realisticOffered {
-            let name = chosen?.name ?? "Voice"
-            strength.left = "Your pitch"
-            strength.right = "\(name)'s pitch"
-            strength.describe = { $0 <= 0 ? "Your pitch" : $0 >= 1 ? "\(name)'s pitch" : "\(Int(($0 * 100).rounded())) percent of the way to \(name)'s pitch" }
+            strength.left = "Your voice"
+            strength.right = "AI voice"
+            strength.describe = { $0 <= 0 ? "Your voice" : $0 >= 1 ? "AI voice" : "\(Int(($0 * 100).rounded())) percent of the way to the AI voice" }
             strength.setAccessibilityLabel("Pitch")
         } else {
             strength.left = "Light"
