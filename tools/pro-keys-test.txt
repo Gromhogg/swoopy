@@ -1,7 +1,19 @@
-# Swoopy Pro: fixed test keys (they unlock nothing in a real build). The key tool and the app must both accept
-# exactly these:
+# Swoopy Pro: fixed test keys (they unlock nothing in a real build). The key tool, the app and the server must all
+# agree on these:
 #   tools/pro-keys.sh test
 #   "build/Swoopy.app/Contents/MacOS/Swoopy" --pro-test tools/pro-keys-test.txt
+#   cd server && npm test
+#
+# Keys (20 characters, since 2026-11-03; each unlocks one Mac), made with the test server secret below. Each line:
+# once, the serial, the key. The tool and the server make them again from the secret; the app only checks their typo
+# part (the server checks the rest). The server's tests sign tokens with the test key pair further down.
+once-secret swoopy-once-test-secret
+once TEST TESTT-PMBCJ-ZJKTG-4YFPR
+once 2222 22224-38NK8-54X4F-ZDZJA
+once ZZZZ ZZZZM-RP3Z4-V26Z2-PCQFP
+once AB3D AB3DM-RRASW-6QF7Q-47HPS
+once K7M9 K7M9B-BPAJM-3BUNR-ET3MD
+once XY8W XY8WP-KRK9R-9FACV-3SF5S
 #
 # Older keys (25 characters, sent out before signed keys), made with the test secret below. Each line: old, the
 # serial, the key. The tool makes them again from the secret; the app (which no longer has any secret) checks that
@@ -26,3 +38,8 @@ signed PQMH9 P2PQM-H93UY-NKQ6Y-AZ4XX-8683G-PJ4VM-RST7P-GCVC7-4RYDP-5YJHM-8ERPA-R
 signed 68UEB P268U-EB39F-XWVAX-S9F82-N4U26-PG85Z-QPTNY-VB2MA-8Z4UU-MSJ3Y-FDVWZ-9G8M3-5686F-B584W-JUFXD-MSR2B-HDTE2-F6KFZ-BKXPE-CXWX8-M5FCB-Y4C2G-PQRH8
 signed AFBEB P2AFB-EB4FE-XX8TX-SFA2M-Z7UEG-VKKDM-GCXBR-VHEN5-FPGUG-N82BT-73CUN-ATJNB-NZ6D8-KPVEU-EKVHQ-KS2WU-NGY6K-EQ56J-KE4U2-RBD5U-XJACV-87EHF-9DTPV
 signed 3WNRJ P23WN-RJ3JB-23GWE-NTH5S-KX5XB-4TQEQ-6XS6N-AWQEY-3ZSWK-D864K-5FQ8N-4H3PJ-7UJJ2-FNNN5-RB7BG-MTDQ4-59W6A-SJ8M8-XQW3R-ENYZP-Z9ZKK-TU4AA-3GHXX
+#
+# The key server's answer (a token) for the first 20-character key on a test Mac, signed with the test key pair at a fixed
+# time (1793750400). Each line: token, the key, the Mac's id, the token. The server makes exactly this again; the app
+# accepts it for that key and that Mac only.
+token TESTT-PMBCJ-ZJKTG-4YFPR 0123456789abcdef0123456789abcdef eyJ2IjoxLCJwIjoic3dvb3B5LXBybyIsImsiOiI4MTM3OGZiYzYyZWJmNTVlYmYyNTk2YjYwMDdlMWYzNyIsIm0iOiIwMTIzNDU2Nzg5YWJjZGVmMDEyMzQ1Njc4OWFiY2RlZiIsInQiOjE3OTM3NTA0MDB9.Rdut6SSr0HLofexIzw8UGsZZCIIXWvVnGssi0ZT-UyKUzzaJdw9CvzjuVcDzR5itngyZGZI2oYhYgsrOpcDZCg

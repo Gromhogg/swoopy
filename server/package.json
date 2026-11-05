@@ -1,15 +1,15 @@
 {
-  "name": "pitch-shift-pro-server",
+  "name": "swoopy-pro-server",
   "private": true,
   "version": "1.0.0",
-  "description": "Swoopy Pro unlock keys: a Cloudflare Worker (Stripe webhook, thank-you page, activation).",
+  "description": "Swoopy Pro keys: a Cloudflare Worker that lets each key unlock one Mac.",
   "license": "GPL-3.0-or-later",
   "type": "module",
   "scripts": {
     "test": "node --test",
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
-    "make-keys": "node scripts/make-keys.mjs --put"
+    "migrate": "wrangler d1 migrations apply swoopy-pro --remote"
   },
   "devDependencies": {
     "wrangler": "4.151.0"
