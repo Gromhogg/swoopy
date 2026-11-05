@@ -46,9 +46,9 @@ More help: [windows/README.md](windows/README.md).
 
 - Pick an app, or **All sound**.
 - Click the big number to type an exact amount, like `2.5` or `-1.25`. 12 is one octave. Or use **−**, **0** and **+**.
-- Turn on **Advanced processing** for music at bigger amounts: going up, the bass stays deep; going down, the top stays bright. A new amount takes a moment longer to kick in.
-- With Advanced processing on, slide from **Bass** to **Treble** to suit your headphones (Mac). Pitch Shift remembers it for each pair of headphones or speakers.
-- Turn on **Auto EQ** (Mac, with Advanced processing on) to keep the deep bass, mids and highs balanced like the original song. Its five small sliders move by themselves; drag one to nudge it, and double-click it or press **Auto** to go back. It's remembered for each pair of headphones or speakers too.
+- Slide from **Bass** to **Treble** to suit your headphones (Mac). Pitch Shift remembers it for each pair of headphones or speakers.
+- Turn on **Auto EQ** (Mac) to keep the deep bass, mids and highs balanced like the original song. Its five small sliders move by themselves; drag one to nudge it, and double-click it or press **Auto** to go back. It's remembered for each pair of headphones or speakers too.
+- Turn on **Advanced processing** (at the bottom of the card) for music at bigger amounts: going up, the bass stays deep; going down, the top stays bright. A new amount takes a moment longer to kick in.
 - Everything on the card can be set while it's off too (Mac): it's used when you turn the card on.
 
 **Input pitch shifter** (your voice)
@@ -81,8 +81,8 @@ More help: [windows/README.md](windows/README.md).
 
 **Pitch Shift Pro ($5, Mac)**
 
-- Free: **Output pitch shifter** with Advanced processing, and **Input pitch shifter** in the Cartoon style, with **Test**.
-- Pro adds the **Voice changer** (with your own voices), the **Natural ↔ Cartoon** and **Bass ↔ Treble** sliders, **Auto EQ**, **Deeper when slow** (with **Higher when fast**) and the **Soundboard**. They show a small lock until you unlock them.
+- Free: everything in **Output pitch shifter** (with **Bass ↔ Treble**, **Auto EQ** and Advanced processing) and **Input pitch shifter** (with **Natural ↔ Cartoon**, **Deeper when slow**, **Higher when fast** and **Test**).
+- Pro adds the **Voice changer** (with your own voices) and the **Soundboard**. They show a small lock until you unlock them.
 - To get a key, click **Unlock Pro** at the top right, then **Email for a key** (or email cbsweetland@gmail.com). Copy the whole key from the email you get back (it's long, 4 lines; spaces and line breaks don't matter), paste it in and click **Unlock**. It works on all your Macs, for good, with no internet needed. Keys sent out before (25 characters) keep working.
 
 ## Your own voices (Mac)
@@ -129,6 +129,7 @@ Pitch Shift Pro: the app's side is `Sources/Pro.swift` and `Sources/ProConfig.sw
 ## How it works
 
 - **Output pitch shifter:** a macOS audio tap grabs the app's sound and mutes the original. [Rubber Band](https://breakfastquay.com/rubberband/) changes the pitch, and the result plays on your current speakers or headphones. It never changes your Mac's sound settings.
+- **Bass ↔ Treble and Auto EQ:** a low shelf at 150 Hz and a high shelf at 5 kHz, and five sections (Sub, Bass, Mids, Highs, Air) kept near the original song's balance, on the shifted sound, with or without Advanced processing. While one of them is in use, a smooth safety limiter keeps boosted sound from clipping without distorting the bass (it adds 20 ms of delay).
 - **Advanced processing:** going up, the bass is shifted an octave less so it stays bass; going down, the song's very top is kept; and a slow tone control keeps the song's overall balance like the original's. Details: [notes/advanced-processing-research.md](notes/advanced-processing-research.md).
 - **Input pitch shifter:** your mic goes through Rubber Band's low-delay shifter (from 6 half-steps up or down: Pitch Shift's own pulse shifter, which moves each pulse of your voice whole, so big shifts don't buzz) into "Pitch Shift Mic", a virtual mic built from [BlackHole](https://github.com/ExistentialAudio/BlackHole) that comes with Pitch Shift (you don't need to install BlackHole). It only runs while an app is listening to Pitch Shift Mic.
 - **Soundboard:** sounds are added to Pitch Shift Mic after your voice, at their normal pitch and an even loudness (very loud, squashed sounds are turned down to match the others); each sound also has its own volume (0–150%). While a sound plays, voice and sound are kept under −3 dBFS, so call apps don't get them clipped. On your Mac's own speakers, your mic is muted while a sound plays, so the call never hears it twice.

@@ -2,19 +2,10 @@
 // it on their Mac with tools/pro-keys.sh and emails it back. The app checks a key on its own, with no internet: a key
 // is signed with the owner's private signing key, and the app holds only the public half, which can check a key but
 // can't make one (see ProKey). An accepted key is kept in ~/Library/Application Support/Pitch Shift/Pro.json and
-// checked again at every launch. While Pro is locked, the paid settings use the free version's values (Free); what
-// was saved is kept and comes back once Pro is unlocked.
+// checked again at every launch. While Pro is locked, the Voice changer stays off and the Soundboard closed; what was
+// saved is kept and comes back once Pro is unlocked. Everything else is free.
 import AppKit
 import CryptoKit
-
-// What the free version uses in place of the paid settings.
-enum Free {
-    static let cartoon: Float = 1  // the voice style stays at Cartoon
-    static let slowDeeper = false  // Deeper when slow stays off
-    static let fastHigher: Float = 0  // and so does Higher when fast
-    static let tone: Float = 0     // Bass ↔ Treble stays in the middle
-    // Auto EQ and the Voice changer stay off.
-}
 
 // The keys, from 31 characters that can't be read two ways (no 0, 1, I, L or O), shown in groups of 5. Typing is
 // forgiving: small letters, spaces, dashes and line breaks don't matter. Must match tools/pro-keys.swift exactly
@@ -179,9 +170,11 @@ final class Pro {
     var file: URL = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         .appendingPathComponent("Pitch Shift/Pro.json")
 
-    // What Pro adds, for the unlock window.
-    static let features = ["the Voice changer", "Natural ↔ Cartoon", "Bass ↔ Treble", "Auto EQ", "Deeper when slow",
-                           "the Soundboard"]
+    // What Pro adds, for the unlock window and --pro-status.
+    static let features = ["the Voice changer", "the Soundboard"]
+    static var featureList: String {
+        features.count > 1 ? features.dropLast().joined(separator: ", ") + " and " + features.last! : features.joined()
+    }
 
     // Pictures only: a key made with the test key pair in tools/pro-keys-test.txt (it unlocks nothing).
     static let exampleKey = "P23WN-RJ3JB-23GWE-NTH5S-KX5XB-4TQEQ-6XS6N-AWQEY-3ZSWK-D864K-5FQ8N-4H3PJ-7UJJ2-FNNN5-RB7BG-"
@@ -410,7 +403,7 @@ final class ProSheet: NSObject, NSTextFieldDelegate {
     }
 
     private func lockedView() -> NSView {
-        let list = Pro.features.dropLast().joined(separator: ", ") + " and " + (Pro.features.last ?? "")
+        let list = Pro.featureList
         let line = "\(list.prefix(1).uppercased() + list.dropFirst()). Email \(ProConfig.email) for a key."
         field.stringValue = ""
         field.isEnabled = true

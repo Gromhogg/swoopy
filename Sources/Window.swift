@@ -1207,7 +1207,7 @@ final class ShiftCard: NSView {
     private let buttons: NSStackView
     private let stack = NSStackView()
     private var rows: [NSView] = []
-    private var tightAfter: [NSView] = []  // rows followed by a tight row (see addRow)
+    private var tightAfter: [(above: NSView, row: NSView)] = []  // rows followed by a tight row (see addRow)
     private var widths: [NSLayoutConstraint] = []
     private var buttonWidths: [NSLayoutConstraint] = []
     private var heights: [Int: CGFloat] = [:]  // height needed at each scale
@@ -1287,11 +1287,16 @@ final class ShiftCard: NSView {
     // Adds a full-width row at the bottom of the card (for example `ShiftCard.switchRow`). Add rows while
     // building the window, before it's laid out. `tight`: closer to the row above (it belongs with it).
     func addRow(_ row: NSView, tight: Bool) {
-        if tight, let above = stack.arrangedSubviews.last {
-            tightAfter.append(above)
-            if scale > 0 { stack.setCustomSpacing((6 * scale).rounded(), after: above) }
-        }
+        if tight, let above = stack.arrangedSubviews.last { tightAfter.append((above, row)) }
         addRow(row)
+        spaceTightRows()
+    }
+
+    // A tight row sits closer to the row above it, but only while it shows: hidden, the row after it gets the usual
+    // space.
+    private func spaceTightRows() {
+        guard scale > 0 else { return }
+        for (above, row) in tightAfter { stack.setCustomSpacing(row.isHidden ? stack.spacing : (6 * scale).rounded(), after: above) }
     }
 
     func addRow(_ row: NSView) {
@@ -1387,7 +1392,7 @@ final class ShiftCard: NSView {
             stack.edgeInsets = NSEdgeInsets(top: (14 * s).rounded(), left: 0, bottom: (16 * s).rounded(), right: 0)
             stack.spacing = (12 * s).rounded()
             if showsAmount { stack.setCustomSpacing((8 * s).rounded(), after: amount) }
-            tightAfter.forEach { stack.setCustomSpacing((6 * s).rounded(), after: $0) }
+            spaceTightRows()
             rows.forEach { ($0 as? CardRow)?.onScale(s) }
             needsDisplay = true
         }
@@ -1428,7 +1433,10 @@ final class ShiftCard: NSView {
     }
 
     // Call when a row is shown or hidden.
-    func forgetHeights() { heights = [:] }
+    func forgetHeights() {
+        heights = [:]
+        spaceTightRows()
+    }
 
     // Updates the number and buttons; `active` shows the card off (everything in it still works then, a little
     // fainter: the settings are used when the card is turned on), `waiting` fades just the number (on, but the
@@ -1528,11 +1536,11 @@ final class ShiftCard: NSView {
 enum Keys {
     static let hearOn = "hearOn", hearSource = "hearSource", halfSteps = "halfSteps", hearAdvanced = "hearAdvanced"
     static let hideAdvancedAlert = "hideAdvancedAlert"  // "Don't show again" was ticked
-    // Advanced processing's Bass ↔ Treble for each speakers or headphones: [device UID: −1 (bass) … 0 … 1 (treble)].
+    // Bass ↔ Treble for each speakers or headphones: [device UID: −1 (bass) … 0 … 1 (treble)].
     // Only what was picked on the slider is stored.
     static let hearTone = "hearTone"
-    // Advanced processing's Auto EQ for each speakers or headphones: [device UID: ["on": Bool, "offsets": five Floats,
-    // dB, Sub … Air]]. Only what the owner changed is stored; anything missing is off with no offsets.
+    // Auto EQ for each speakers or headphones: [device UID: ["on": Bool, "offsets": five Floats, dB, Sub … Air]].
+    // Only what the owner changed is stored; anything missing is off with no offsets.
     static let hearAutoEQ = "hearAutoEQ"
     static let voiceOn = "voiceOn", voiceSteps = "voiceSteps", voiceMic = "voiceMic"
     static let voiceCartoon = "voiceCartoon"  // voice style, 0 (Natural) to 1 (Cartoon)
@@ -1552,18 +1560,17 @@ enum Keys {
 
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWindowDelegate {
     let defaults = UserDefaults.standard
-    // While Pitch Shift Pro is locked, the paid settings use the free version's values (Free); what's saved is kept.
     lazy var hear = HearShifter(
         halfSteps: defaults.object(forKey: Keys.halfSteps) as? Float ?? 2,
         source: HearSource(saved: defaults.string(forKey: Keys.hearSource) ?? defaults.string(forKey: "source")),
         advanced: defaults.bool(forKey: Keys.hearAdvanced),
-        tones: Pro.shared.unlocked ? AppDelegate.savedTones(defaults) : [:],
-        autoEQs: Pro.shared.unlocked ? AppDelegate.savedAutoEQs(defaults) : [:])
+        tones: AppDelegate.savedTones(defaults),
+        autoEQs: AppDelegate.savedAutoEQs(defaults))
     lazy var voice = VoiceShifter(
         halfSteps: defaults.object(forKey: Keys.voiceSteps) as? Float ?? 3,
-        cartoon: Pro.shared.unlocked ? AppDelegate.savedCartoon(defaults) : Free.cartoon,
-        slowDeeper: Pro.shared.unlocked ? defaults.bool(forKey: Keys.voiceSlowDeeper) : Free.slowDeeper,
-        fastHigher: Pro.shared.unlocked ? AppDelegate.savedFastHigher(defaults) : Free.fastHigher,
+        cartoon: AppDelegate.savedCartoon(defaults),
+        slowDeeper: defaults.bool(forKey: Keys.voiceSlowDeeper),
+        fastHigher: AppDelegate.savedFastHigher(defaults),
         micUID: defaults.string(forKey: Keys.voiceMic))
     lazy var test = VoiceTest(voice: voice)
     // Sound effects into Pitch Shift Mic. Pictures show example names and change nothing.
@@ -1708,13 +1715,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         return steps == 0 ? "Off" : "\(steps) half-steps higher"
     }
     let fastLabel = NSTextField(labelWithString: "Higher when fast")
-    // Advanced processing's tone for the speakers or headphones playing now: 0 = more bass, 0.5 = middle, 1 = more treble.
+    // The tone for the speakers or headphones playing now: 0 = more bass, 0.5 = middle, 1 = more treble.
     let tone = GradientSlider(left: "Bass", right: "Treble", name: "Tone") { value in
         let percent = Int(((value * 2 - 1) * 100).rounded())
         return percent == 0 ? "Middle" : "\(abs(percent)) percent more \(percent < 0 ? "bass" : "treble")"
     }
-    // Auto EQ (Advanced processing), also kept for each speakers or headphones: a switch, and while it's on, five
-    // small sliders that follow the sound (see updateAutoEQTimer).
+    // Auto EQ, also kept for each speakers or headphones: a switch, and while it's on, five small sliders that follow the
+    // sound (see updateAutoEQTimer).
     let autoEQSwitch = GradientSwitch()
     let autoEQStrip = AutoEQStrip()
     private var autoEQRow: CardRow!
@@ -1861,21 +1868,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
             self?.defaults.set(value, forKey: Keys.halfSteps)
             self?.refresh()
         }
-        // Advanced processing (music): keeps the song balanced at big shifts. Turning it on asks first.
-        advancedSwitch.onChange = { [weak self] on in self?.advancedPicked(on) }
-        hearCard.addRow(ShiftCard.switchRow("Advanced processing", advancedSwitch))
-        // Its tone, Bass ... Treble, kept for each speakers or headphones.
+        // The tone, Bass ... Treble, kept for each speakers or headphones.
         tone.mark = 0.5
         tone.onChange = { [weak self] value in self?.tonePicked(value) }
         // Locked controls (Pitch Shift Pro) only open the unlock window.
-        for slider in [tone, style, strength, realism, fastSlider] { slider.onLockedClick = { [weak self] in self?.showUnlock() } }
-        for toggle in [slowSwitch, autoEQSwitch] { toggle.onLockedClick = { [weak self] in self?.showUnlock() } }
+        for slider in [strength, realism] { slider.onLockedClick = { [weak self] in self?.showUnlock() } }
         let toneRow = CardRow(views: [tone])
         toneRow.onScale = { [unowned self] scale in
             tone.scale = scale
-            tone.rowHeight = Theme.controlSize(scale) == .large ? 22 : 19  // like the Advanced processing switch
+            tone.rowHeight = Theme.controlSize(scale) == .large ? 22 : 19  // like the switch rows
         }
-        hearCard.addRow(toneRow, tight: true)
+        hearCard.addRow(toneRow)
         // Auto EQ: keeps Sub, Bass, Mids, Highs and Air near the song's own balance. While it's on, five small sliders
         // show its gains as they move and take a nudge. Kept for each speakers or headphones.
         autoEQSwitch.onChange = { [weak self] on in self?.autoEQPicked(on: on) }
@@ -1885,6 +1888,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         autoEQRow.isHidden = true
         autoEQRow.onScale = { [unowned self] scale in autoEQStrip.scale = scale }
         hearCard.addRow(autoEQRow, tight: true)
+        // Advanced processing (music), at the bottom: keeps the song balanced at big shifts. Turning it on asks first.
+        advancedSwitch.onChange = { [weak self] on in self?.advancedPicked(on) }
+        hearCard.addRow(ShiftCard.switchRow("Advanced processing", advancedSwitch))
 
         style.onChange = { [weak self] value in self?.stylePicked(value) }
         testButton.bezelStyle = .rounded
@@ -2024,7 +2030,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
 
         // Tab goes through one card, then the next.
         let autoEQViews: [NSView] = [autoEQSwitch] + autoEQStrip.bands + [autoEQStrip.reset]
-        let hearViews: [NSView] = hearCard.keyViews + [advancedSwitch, tone] + autoEQViews
+        let hearViews: [NSView] = hearCard.keyViews + [tone] + autoEQViews + [advancedSwitch]
         let voiceViews: [NSView] = voiceCard.keyViews + [style, testButton, slowSwitch, fastSlider, installButton, soundsButton]
         let changerViews: [NSView] = changerCard.keyViews + [strength, realism, secondSwitch, quietSwitch]
         let order: [NSView] = hearViews + voiceViews + changerViews
@@ -2118,22 +2124,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         ProSheet.shared.show(on: window)
     }
 
-    // Unlocked: the saved paid settings come back. Locked: the free version's values are used (nothing saved changes).
+    // Unlocked: the Voice changer comes back as saved. Locked: it goes off and the Soundboard closes (nothing saved
+    // changes).
     func proChanged() {
         if Pro.shared.unlocked {
-            voice.cartoon = AppDelegate.savedCartoon(defaults)
-            voice.slowDeeper = defaults.bool(forKey: Keys.voiceSlowDeeper)
-            voice.fastHigher = AppDelegate.savedFastHigher(defaults)
-            for (uid, tilt) in AppDelegate.savedTones(defaults) { hear.setTone(tilt, for: uid) }
-            for (uid, eq) in AppDelegate.savedAutoEQs(defaults) { hear.setAutoEQ(on: eq.on, offsets: eq.offsets, for: uid) }
             restoreChanger()  // the Voice changer as saved; if it's on, it starts (and Your voice goes off)
             if voice.changer.on && preview == nil { setChanger(true) }
         } else {
-            voice.cartoon = Free.cartoon
-            voice.slowDeeper = Free.slowDeeper
-            voice.fastHigher = Free.fastHigher
-            for uid in hear.tones.keys { hear.setTone(Free.tone, for: uid) }
-            for uid in hear.autoEQs.keys { hear.setAutoEQ(on: false, offsets: [], for: uid) }
             voice.changer.on = false
             voice.stopChanger()
             if preview == nil && !voice.running { DefaultMic.giveBack() }
@@ -2515,9 +2512,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
     }
 
     // Auto EQ's sliders follow the sound about 15 times a second, but only while they can move and be seen: Auto EQ
-    // on for these speakers or headphones, Advanced processing playing, and the window showing.
+    // on for these speakers or headphones, What you hear on, and the window showing.
     private func updateAutoEQTimer() {
-        let running = hear.isOn && hear.advanced && hear.autoEQ(for: outputUID).on
+        let running = hear.isOn && hear.autoEQ(for: outputUID).on
         let live = preview == nil && running && window.isVisible && window.occlusionState.contains(.visible)
         if live, autoEQTimer == nil {
             let timer = Timer(timeInterval: 1.0 / 15, repeats: true) { [weak self] _ in self?.readAutoEQ() }
@@ -2645,7 +2642,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         }
         hear.advanced = on
         defaults.set(on, forKey: Keys.hearAdvanced)
-        refresh()  // the tone slider works only with it on
+        refresh()
     }
 
     // A sheet on the window: Turn On, or Cancel (the switch goes back off and nothing is saved).
@@ -2852,7 +2849,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
     // changer state, Your voice shows off (only one at a time).
     func showPreview() {
         guard let preview else { return }
-        // With Pitch Shift Pro locked (pro-locked, pro-unlock), the paid controls keep the free version's values.
+        // With Pitch Shift Pro locked (pro-locked, pro-unlock), the Soundboard stays closed.
         let pro = Pro.shared.unlocked
         if preview.contains("light") {
             window.appearance = NSAppearance(named: .aqua)
@@ -2866,16 +2863,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
             if preview.contains("volume") { soundboard.showVolume() }  // the first sound's volume slider
             if preview.contains("drop") { soundboard.showDropping() }  // sound files dragged over it
         }
-        if let cartoonArg, pro { voice.cartoon = cartoonArg }  // where the style slider is (--cartoon-amount 0.5)
+        if let cartoonArg { voice.cartoon = cartoonArg }  // where the style slider is (--cartoon-amount 0.5)
         if let steps = arg("--steps")?.split(separator: ",").compactMap({ Float($0) }), let first = steps.first {
             hear.halfSteps = AmountField.clamp(first)  // the two big numbers (--steps 3,-2)
             voice.halfSteps = AmountField.clamp(steps.last ?? first)
         }
         if preview.contains("tone") { hear.advanced = true }  // Advanced processing on (nothing runs in pictures)
-        if let toneArg, !outputUID.isEmpty, pro { hear.setTone(toneArg, for: outputUID) }  // the tone slider (--tone-amount -0.4)
-        if preview.contains("slow"), pro { voice.slowDeeper = true }  // "Deeper when slow" on
+        if let toneArg, !outputUID.isEmpty { hear.setTone(toneArg, for: outputUID) }  // the tone slider (--tone-amount -0.4)
+        if preview.contains("slow") { voice.slowDeeper = true }  // "Deeper when slow" on
         if !outputUID.isEmpty {  // Auto EQ on with "eq" (--eq-offsets 3,-2,0,1,-1 sets its sliders), off without
-            hear.setAutoEQ(on: preview.contains("eq") && pro, offsets: pro ? autoEQArg.offsets.map(Float.init) : [], for: outputUID)
+            hear.setAutoEQ(on: preview.contains("eq"), offsets: autoEQArg.offsets.map(Float.init), for: outputUID)
         }
         refresh()
         // Half a second in, Your voice's switch (click-voice) or the Voice changer's (click-vc; a name with "changer"
@@ -2980,22 +2977,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         let waiting = preview.map { $0.contains("waiting") } ?? (hear.state == .waiting)
         hearCard.show(on: hearOn, value: hear.halfSteps, active: hearOn, waiting: waiting)
         if advancedAlert == nil { advancedSwitch.isOn = hear.advanced }  // stays on while the alert asks
-        // Pitch Shift Pro: locked controls show the free version's value, dimmed with a small lock.
+        // Pitch Shift Pro: locked controls (the Voice changer's) are dimmed, with a small lock.
         let locked = !Pro.shared.unlocked
-        tone.locked = locked
-        style.locked = locked
-        slowSwitch.locked = locked
-        fastSlider.locked = locked
         tone.value = (((hear.tones[outputUID] ?? 0) + 1) / 2 * 100).rounded() / 100
-        tone.isEnabled = hear.advanced
-        tone.toolTip = locked ? "Pitch Shift Pro" : outputName.isEmpty ? nil : "For \(outputName)"
-        // Auto EQ: off while Pitch Shift Pro is locked (its sliders show only while it's on).
-        autoEQSwitch.locked = locked
+        tone.toolTip = outputName.isEmpty ? nil : "For \(outputName)"
+        // Auto EQ: its sliders show only while it's on.
         let eq = hear.autoEQ(for: outputUID)
         autoEQSwitch.isOn = eq.on
-        autoEQSwitch.isEnabled = hear.advanced
         autoEQStrip.offsets = eq.offsets
-        autoEQStrip.isEnabled = hear.advanced
         if autoEQRow.isHidden == eq.on {  // the sliders show while Auto EQ is on
             Theme.crossfade(hearCard, 0.2)
             autoEQRow.isHidden = !eq.on
@@ -3020,15 +3009,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         if hasMic { showCurrentMic() }
         style.value = voice.cartoon
         style.isEnabled = installed
-        style.toolTip = locked ? "Pitch Shift Pro" : nil
         slowSwitch.isOn = voice.slowDeeper
         slowSwitch.isEnabled = installed
-        slowSwitch.toolTip = locked ? "Pitch Shift Pro" : nil
         // Higher when fast works only with Deeper when slow on (so never with the Voice changer: only one at a time).
         fastSlider.value = voice.fastHigher / SpeakingRate.maxUp
         fastSlider.isEnabled = installed && voice.slowDeeper
-        fastLabel.textColor = fastSlider.isEnabled && !locked ? .secondaryLabelColor : .tertiaryLabelColor
-        fastLabel.toolTip = locked ? "Pitch Shift Pro" : nil
+        fastLabel.textColor = fastSlider.isEnabled ? .secondaryLabelColor : .tertiaryLabelColor
         soundsButton.isEnabled = installed && hasMic  // the Soundboard works with the voice off too
         if case .problem(let message) = voice.state { voiceCard.amount.toolTip = message } else { voiceCard.amount.toolTip = nil }
         showChanger(active: changerActive, usable: installed && hasMic, locked: locked)

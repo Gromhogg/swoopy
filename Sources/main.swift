@@ -73,10 +73,11 @@
 //                                              button), so its level in Pitch Shift Mic should be V x the file.
 //                                              --voice-off: as with "Your voice" off and the Soundboard open: the
 //                                              tone must come through at its own pitch (440 Hz), no shift.
-//   --test ... --advanced [--record-out F.wav] [--steps-at "3:8,6:-5"] [--tone-amount 0.5] [--tone-at "2:1,4:-1"]
+//   --test ... [--advanced] [--record-out F.wav] [--steps-at "3:8,6:-5"] [--tone-amount 0.5] [--tone-at "2:1,4:-1"]
 //              [--as-device UID] [--tone-db 6,-6] [--auto-eq] [--eq-offsets 0,0,0,0,0]
-//                                              "What you hear" with Advanced processing on (--watch prints the delay;
-//                                              --record-out saves what it played; --steps-at changes the amount live;
+//                                              "What you hear", --advanced with Advanced processing on (--watch prints
+//                                              the delay; --record-out saves what Advanced processing played;
+//                                              --steps-at changes the amount live;
 //                                              --tone-amount sets the Bass ↔ Treble slider, −1 … 1, for the output;
 //                                              --tone-at moves it live; --as-device uses that device's saved Bass ↔
 //                                              Treble and Auto EQ as if it were playing; --tone-db sets bass and
@@ -85,16 +86,16 @@
 //                                              Auto EQ; --watch also prints its gains and levels while it's in use)
 //   --render-file IN OUT [--steps 5] [--advanced] [--steps-at "4:8,8:-5"] [--tone-amount 0.5] [--tone-at "2:1,4:-1"]
 //                [--tone-db 6,-6] [--auto-eq] [--eq-offsets 0,0,0,0,0]
-//                                              shifts a sound file with the app's own code (normal or advanced)
-//   --as-free (with any mode above)            as the free version plays it: Bass ↔ Treble in the middle, Auto EQ off,
-//                                              the voice style at Cartoon, Deeper when slow and Higher when fast off,
-//                                              no Voice changer; the options for those are ignored (one note says
-//                                              which), and --render-sounds, --test-sounds (the Soundboard) and
-//                                              --add-voice, --rename-voice, --remove-voice stop with a message.
+//                                              shifts a sound file with the app's own code (normal or advanced; Bass ↔
+//                                              Treble and Auto EQ in both)
+//   --as-free (with any mode above)            as the free version plays it: no Voice changer (its options are
+//                                              ignored, one note says which), and --render-sounds, --test-sounds (the
+//                                              Soundboard) and --add-voice, --rename-voice, --remove-voice stop with a
+//                                              message. Everything else is free.
 //                                              A copy with Pitch Shift Pro locked always plays this way, like the
 //                                              window ("Pitch Shift Pro is locked: ... ignored (free version)").
 // Pitch Shift Pro (Sources/Pro.swift, notes/paid-unlock-plan.md):
-//   --pro-status                               locked or unlocked, and why
+//   --pro-status                               locked or unlocked, and why, and what Pro adds
 //   --pro-key KEY                              unlocks with a key, like the unlock window (checks it on this Mac, no
 //                                              internet, and keeps it)
 //   --pro-reset                                locks Pro again (forgets the key)
@@ -126,7 +127,7 @@ func arg(_ name: String) -> String? {
 // changer-second-off, changer-quiet-on, changer-card-off, click-voice, click-vc;
 // --cartoon-amount sets the voice style slider; sounds opens the Soundboard with example names, rename shows the first
 // name being changed, volume the first sound's volume slider and drop files being dragged over it; "tone" shows
-// Advanced processing on, and --tone-amount sets the Bass ↔ Treble slider; slow turns on "Deeper when slow"; eq turns
+// Advanced processing on; --tone-amount sets the Bass ↔ Treble slider; slow turns on "Deeper when slow"; eq turns
 // on Auto EQ, and --eq-offsets sets its five sliders, which show only the offsets since no sound plays; without eq,
 // Auto EQ shows off; changer turns on the Voice changer with Woman (Your voice then shows off, even with voice-on:
 // only one at a time), changer-man with Man (--voice NAME: that voice, an added one too), --strength sets its
@@ -152,8 +153,8 @@ if let path = arg("--pro-file") { Pro.shared.file = URL(fileURLWithPath: path) }
 if args.contains("--pro-server") { print("--pro-server: there is no server any more (keys are checked on this Mac)"); exit(1) }
 if args.contains("--pro-secret") { print("--pro-secret: there is no key secret any more (keys are signed); see --pro-public-key"); exit(1) }
 // While Pitch Shift Pro is locked (a build with the public key and no key that works), every mode below plays as the
-// free version does, like the window (see Free): the options for paid features are ignored with one note, and the
-// Soundboard modes and adding voices stop here, before any device is touched. --as-free does the same in any copy
+// free version does, like the window (see Pro.features): the Voice changer's options are ignored with one note, and
+// the Soundboard modes and adding voices stop here, before any device is touched. --as-free does the same in any copy
 // (for comparing). Pictures (--preview) show the state they're asked for instead and play nothing.
 if preview == nil { Pro.shared.load() }
 let proLocked = preview == nil && !Pro.shared.unlocked
@@ -166,10 +167,9 @@ if asFree {
     if let mode = ["--add-voice", "--rename-voice", "--remove-voice"].first(where: args.contains) {
         print("\(why): your own voices are part of Pitch Shift Pro, so \(mode) doesn't run (free version)."); exit(1)
     }
-    // The Voice changer, Natural ↔ Cartoon, Deeper when slow and Higher when fast, Bass ↔ Treble, Auto EQ.
-    let paid = ["--voice", "--strength", "--realism", "--quality", "--changer-tune", "--changer-stats", "--block-background",
-                "--cartoon", "--cartoon-amount", "--cartoon-at", "--slow-deeper", "--fast-higher",
-                "--tone-db", "--tone-amount", "--tone-at", "--as-device", "--auto-eq", "--eq-offsets"].filter(args.contains)
+    // The Voice changer.
+    let paid = ["--voice", "--strength", "--realism", "--quality", "--changer-tune", "--changer-stats", "--block-background"]
+        .filter(args.contains)
     if !paid.isEmpty { print("\(why): \(paid.joined(separator: ", ")) ignored (free version).") }
 }
 // Checks of the key code only: --pro-public-key HEX checks keys with that public key instead of this build's, and
@@ -206,26 +206,24 @@ func onQuitSignals(_ handler: @escaping () -> Void) {
     }
 }
 
-// --tone-db "B,T": Advanced processing's bass and treble in dB (not --tone, which is a frequency in --test-voice).
-// The free version (asFree): none of the Bass ↔ Treble or Auto EQ options below.
+// --tone-db "B,T": bass and treble in dB (not --tone, which is a frequency in --test-voice).
 let toneDbArg: (bass: Double, treble: Double)? = {
     let parts = (arg("--tone-db") ?? "").split(separator: ",").compactMap { Double($0) }
-    return parts.count == 2 && !asFree ? (parts[0], parts[1]) : nil
+    return parts.count == 2 ? (parts[0], parts[1]) : nil
 }()
 // --tone-amount T: the Bass ↔ Treble slider, −1 (more bass) … 0 (middle) … 1 (more treble). In --preview it sets
 // where the slider is. --tone-at "2:1,4:-1": moves it to 1 at 2 s, then to −1 at 4 s.
 func parseTilt(_ text: Substring) -> Float? { Float(text).flatMap { $0.isFinite ? max(-1, min(1, $0)) : nil } }
-let toneArg: Float? = asFree ? nil : arg("--tone-amount").flatMap { parseTilt(Substring($0)) }
-let toneChanges: [(Double, Float)] = asFree ? [] : (arg("--tone-at") ?? "").split(separator: ",").compactMap { item in
+let toneArg: Float? = arg("--tone-amount").flatMap { parseTilt(Substring($0)) }
+let toneChanges: [(Double, Float)] = (arg("--tone-at") ?? "").split(separator: ",").compactMap { item in
     let parts = item.split(separator: ":")
     guard parts.count == 2, let t = Double(parts[0]), let value = parseTilt(parts[1]) else { return nil }
     return (t, value)
 }
 
-// --auto-eq: Advanced processing's Auto EQ on. --eq-offsets "a,b,c,d,e": its manual offsets in dB (Sub, Bass, Mids,
-// Highs, Air; −12 … 12; missing ones are 0).
+// --auto-eq: Auto EQ on. --eq-offsets "a,b,c,d,e": its manual offsets in dB (Sub, Bass, Mids, Highs, Air; −12 … 12;
+// missing ones are 0).
 let autoEQArg: (on: Bool, offsets: [Double]) = {
-    guard !asFree else { return (false, AdvancedProcessor.noOffsets) }
     let given = (arg("--eq-offsets") ?? "").split(separator: ",").compactMap { Double($0) }.filter(\.isFinite).map { max(-12, min(12, $0)) }
     return (args.contains("--auto-eq"), Array((given + AdvancedProcessor.noOffsets).prefix(5)))
 }()
@@ -235,9 +233,8 @@ func fourCC(_ value: UInt32) -> String {
 }
 
 // Voice style from the command line: --cartoon = 1 (Cartoon), --cartoon-amount X (0 = Natural ... 1 = Cartoon).
-// In --preview it sets where the slider is. The free version: always Cartoon.
-let cartoonArg: Float? = asFree ? Free.cartoon
-    : args.contains("--cartoon") ? 1 : arg("--cartoon-amount").flatMap(Float.init).map { max(0, min(1, $0)) }
+// In --preview it sets where the slider is.
+let cartoonArg: Float? = args.contains("--cartoon") ? 1 : arg("--cartoon-amount").flatMap(Float.init).map { max(0, min(1, $0)) }
 // "Deeper when slow" asked for (--test-voice, --render-voice; left out with --voice, see slowDeeperArg).
 let slowDeeperAsked = args.contains("--slow-deeper")
 
@@ -288,10 +285,9 @@ let changerArg: ChangerOptions? = {
 if changerArg != nil && (arg("--steps") != nil || slowDeeperAsked) {
     print("Note: with --voice the voice changer sets the pitch, so --steps and --slow-deeper are ignored (only one at a time).")
 }
-let slowDeeperArg = asFree ? Free.slowDeeper : slowDeeperAsked && changerArg == nil
+let slowDeeperArg = slowDeeperAsked && changerArg == nil
 // "Higher when fast" with --slow-deeper: --fast-higher N half-steps (0 ... 8; left out = 0, off, as before).
-let fastHigherArg: Float = asFree ? Free.fastHigher
-    : slowDeeperArg ? VoiceShifter.cleanFastHigher(arg("--fast-higher").flatMap(Float.init) ?? 0) : 0
+let fastHigherArg: Float = slowDeeperArg ? VoiceShifter.cleanFastHigher(arg("--fast-higher").flatMap(Float.init) ?? 0) : 0
 // The amount for the voice: --steps (or `fallback`), except with --voice, where it is not used (the changer sets the
 // pitch; the fallback keeps the renders as they were).
 func voiceStepsArg(_ fallback: Float) -> Float { changerArg != nil ? fallback : arg("--steps").flatMap(Float.init) ?? fallback }
@@ -497,6 +493,7 @@ if args.contains("--list") {
 if args.contains("--pro-status") {
     Pro.shared.load()
     print(Pro.shared.status)
+    print("Pro adds \(Pro.featureList); everything else is free.")
     exit(0)
 }
 
@@ -607,12 +604,9 @@ if let input = arg("--render-file") {
     }
     let started = Date()
     do {
-        // --as-free: Bass ↔ Treble stays in the middle and Auto EQ off, as in the free version.
         try renderFile(input: input, output: args[i + 2], halfSteps: arg("--steps").flatMap(Float.init) ?? 2,
                        advanced: args.contains("--advanced"), changes: changes,
-                       tone: asFree ? AdvancedProcessor.toneDb(tilt: Free.tone) : toneDbArg ?? AdvancedProcessor.toneDb(tilt: toneArg ?? 0),
-                       toneChanges: asFree ? [] : toneChanges,
-                       autoEQ: asFree ? (false, AdvancedProcessor.noOffsets) : autoEQArg)
+                       tone: toneDbArg ?? AdvancedProcessor.toneDb(tilt: toneArg ?? 0), toneChanges: toneChanges, autoEQ: autoEQArg)
         print(String(format: "wrote %@ (%.1f s)", args[i + 2], Date().timeIntervalSince(started)))
         exit(0)
     } catch {
@@ -648,10 +642,9 @@ if let input = arg("--render-voice") {
         }
     }
     do {
-        // --as-free: the style stays at Cartoon, Deeper when slow off and no voice changer, as in the free version.
+        // --as-free: no voice changer, as in the free version.
         try renderVoiceFile(input: input, output: args[i + 2], halfSteps: voiceStepsArg(3),
-                            cartoon: asFree ? Free.cartoon : cartoonArg ?? 0, changes: asFree ? [] : changes,
-                            slowDeeper: asFree ? Free.slowDeeper : slowDeeperArg, fastHigher: asFree ? Free.fastHigher : fastHigherArg,
+                            cartoon: cartoonArg ?? 0, changes: changes, slowDeeper: slowDeeperArg, fastHigher: fastHigherArg,
                             levelFix: preset != "old",
                             changer: changerArg)
         // Realistic: the AI voice over the same file, inline (it never comes late), with the Natural render as its
@@ -711,15 +704,14 @@ if let input = arg("--render-sounds") {
 if args.contains("--test") {
     let source: HearSource = args.contains("--all") ? .all : HearSource(saved: arg("--app") ?? "com.apple.Music")
     // Uses the saved Bass ↔ Treble and Auto EQ for the output, like the app (only read; --tone-amount changes the tone
-    // for this test, --auto-eq / --eq-offsets replace the Auto EQ). The free version: none of them, like the window.
+    // for this test, --auto-eq / --eq-offsets replace the Auto EQ).
     let shifter = HearShifter(halfSteps: arg("--steps").flatMap(Float.init) ?? 2, source: source, advanced: args.contains("--advanced"),
-                              tones: asFree ? [:] : AppDelegate.savedTones(UserDefaults.standard),
-                              autoEQs: asFree ? [:] : AppDelegate.savedAutoEQs(UserDefaults.standard))
+                              tones: AppDelegate.savedTones(UserDefaults.standard), autoEQs: AppDelegate.savedAutoEQs(UserDefaults.standard))
     shifter.testPID = arg("--pid").flatMap { pid_t($0) }
-    shifter.testOutputKey = asFree ? nil : arg("--as-device")
+    shifter.testOutputKey = arg("--as-device")
     shifter.fixedToneDb = toneDbArg
     if let toneArg { shifter.setTone(toneArg, for: shifter.outputKey) }
-    if !asFree && (args.contains("--auto-eq") || arg("--eq-offsets") != nil) { shifter.fixedAutoEQ = autoEQArg }
+    if args.contains("--auto-eq") || arg("--eq-offsets") != nil { shifter.fixedAutoEQ = autoEQArg }
     let usedEQ = shifter.fixedAutoEQ ?? shifter.autoEQ(for: shifter.outputKey).engine
     let showAutoEQ = usedEQ.on || usedEQ.offsets.contains { $0 != 0 }
     for (t, value) in toneChanges {
@@ -973,7 +965,7 @@ if args.contains("--test-voice") {
 // tone.
 if args.contains("--test-button") {
     let micUID = arg("--mic").flatMap { name in Mics.list().first { $0.name == name }?.uid }  // e.g. not a Bluetooth headset's
-    let voice = VoiceShifter(halfSteps: voiceStepsArg(3), cartoon: asFree ? Free.cartoon : 0, micUID: micUID)
+    let voice = VoiceShifter(halfSteps: voiceStepsArg(3), cartoon: 0, micUID: micUID)
     let rate = voice.currentMic.map(nominalRate) ?? 48000
     let volume = arg("--volume").flatMap(Double.init) ?? 0.03
     var speech = arg("--file").map { testVoiceFile($0, rate: rate) } ?? []

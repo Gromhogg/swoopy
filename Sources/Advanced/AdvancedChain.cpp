@@ -1773,3 +1773,165 @@ int advanced_tune(AdvancedChain *chain, const char *key, double v) {
 }
 
 }  // extern "C"
+
+// ------------------------------------------------------------------------------------------------- tone on its own
+
+namespace {
+
+// The tone stage's safety limiter, smoother than the engine's (the same idea as Super Advanced's). A boost can push a
+// loud song over full scale. A limiter that pulls that down within 2 ms and lets go within 25 ms changes the gain inside
+// each bass wave, which is heard as distortion. This one looks 20 ms ahead, lowers the gain along a smooth S-curve
+// (two running averages of the lowest gain needed), and lets it back up over 1 s (Super Advanced's final settings). Off (`enabled` false) or under the
+// ceiling its gain is exactly 1: the output is the input delayed by `look` samples, bit for bit.
+struct SmoothLimiter {
+    static constexpr double ceiling = 0.966;  // -0.3 dBFS
+    bool enabled = true;
+    int nch = 2, look = 960, length = 961, firstLength = 481, secondLength = 481;
+    double release = 0.99998, holdValue = 1, firstSum = 481, sum = 481;
+    int64_t now = 0;
+    int position = 0, first = 0, second = 0, front = 0, count = 0;
+    std::vector<float> delay[MAXCH];
+    std::vector<double> need, held, smoothed;
+    std::vector<int64_t> rising;  // for the lowest need: times whose needs rise, oldest first (a ring)
+
+    void init(double rate, int channels, double lookMs = 20, double releaseMs = 1000) {
+        nch = channels;
+        look = std::max(2, int(std::lround(lookMs * 0.001 * rate)) & ~1); length = look + 1;
+        firstLength = look / 2 + 1; secondLength = look - firstLength + 2;
+        release = std::exp(-1.0 / (releaseMs * 0.001 * rate));
+        for (int c = 0; c < MAXCH; c++) delay[c].assign(length, 0.0f);
+        need.assign(length, 1.0); held.assign(firstLength, 1.0); smoothed.assign(secondLength, 1.0); rising.assign(length, 0);
+        holdValue = 1; firstSum = firstLength; sum = secondLength;
+        now = 0; position = first = second = front = count = 0;
+    }
+    // v: one sample per channel, replaced by the limited sample from `look` samples ago
+    inline void run(float *v) {
+        double peak = 0;
+        for (int c = 0; c < nch; c++) peak = std::max(peak, (double)fabsf(v[c]));
+        double wanted = (enabled && peak > ceiling) ? ceiling * (1.0 - 4e-6) / peak : 1.0;
+        // the lowest need of the last `length` samples
+        if (count > 0 && rising[front] <= now - length) { front = front + 1 == length ? 0 : front + 1; count--; }
+        need[position] = wanted;
+        while (count > 0 && need[(size_t)(rising[(front + count - 1) % length] % length)] >= wanted) count--;
+        rising[(front + count) % length] = now; count++;
+        double lowest = need[(size_t)(rising[front] % length)];
+        holdValue = lowest < holdValue ? lowest : lowest - (lowest - holdValue) * release;
+        if (lowest == 1.0 && holdValue > 1.0 - 1e-7) holdValue = 1.0;
+        // two running averages one after the other: the gain eases down along an S-curve, and is low enough by the
+        // time the peak comes out
+        firstSum += holdValue - held[first]; held[first] = holdValue;
+        double eased = firstSum / firstLength;
+        sum += eased - smoothed[second]; smoothed[second] = eased;
+        double gain = std::min(1.0, sum / secondLength);
+        int oldest = position + 1 == length ? 0 : position + 1;
+        for (int c = 0; c < nch; c++) {
+            delay[c][position] = v[c];
+            float y = delay[c][oldest];
+            if (gain < 1.0) y = (float)std::max(-ceiling, std::min(ceiling, y * gain));
+            v[c] = y;
+        }
+        now++;
+        if (++position == length) position = 0;
+        if (++first == firstLength) {  // add the gains up again once per lap, so rounding never builds up
+            first = 0; firstSum = 0;
+            for (double h : held) firstSum += h;
+        }
+        if (++second == secondLength) {
+            second = 0; sum = 0;
+            for (double h : smoothed) sum += h;
+        }
+    }
+};
+
+}  // namespace
+
+// Bass / treble and Auto EQ for the app's normal mode (tonechain_*, see AdvancedChain.h): the engine's own AutoEQ5 and
+// ToneStage in the same order, then a smooth safety limiter, which only works while one of them is in use. With both
+// untouched (the default) the stages are skipped and the limiter's gain stays exactly 1, so the output is the input
+// delayed by the limiter's look-ahead, bit for bit.
+struct ToneChain {
+    double sr = 48000;
+    int nch = 2, SB = 256;
+    int64_t t = 0;                     // samples processed (Auto EQ works in SB blocks, like the engine)
+    AutoEQ5 aeq;
+    ToneStage tone;
+    SmoothLimiter lim;
+    std::vector<float> x[MAXCH], ref;  // scratch (made once)
+
+    ToneChain(double rate, int channels) : sr(rate), nch(channels) {
+        SB = rate > 64000 ? 512 : 256;
+        lim.init(sr, nch);
+        tone.init(sr, nch);
+        aeq.init(sr, nch, SB);
+        for (int c = 0; c < nch; c++) x[c].assign(SB, 0.0f);
+        ref.assign(SB, 0.0f);
+    }
+
+    void process(float *const *io, const float *refIn, int frames) {
+        int done = 0;
+        while (done < frames) {
+            int m = (int)std::min<int64_t>(frames - done, SB - (t % SB));
+            bool toneRuns = !(tone.flat() && tone.idle >= tone.idleLimit);
+            lim.enabled = aeq.active() || !tone.flat();
+            if (aeq.active() || toneRuns) {
+                for (int c = 0; c < nch; c++) std::copy(io[c] + done, io[c] + done + m, x[c].begin());
+                if (aeq.active()) {
+                    float *r = ref.data();
+                    if (refIn) std::copy(refIn + done, refIn + done + m, r);
+                    else for (int i = 0; i < m; i++) {  // no original given: the sound itself
+                        float s = 0;
+                        for (int c = 0; c < nch; c++) s += x[c][i];
+                        r[i] = s / nch;
+                    }
+                    aeq.run(x, r, m, (t + m) % SB == 0);
+                }
+                tone.run(x, m);
+                for (int c = 0; c < nch; c++) std::copy(x[c].begin(), x[c].begin() + m, io[c] + done);
+            }
+            for (int i = 0; i < m; i++) {
+                float v[MAXCH];
+                for (int c = 0; c < nch; c++) v[c] = io[c][done + i];
+                lim.run(v);
+                for (int c = 0; c < nch; c++) io[c][done + i] = v[c];
+            }
+            t += m;
+            done += m;
+        }
+    }
+};
+
+extern "C" {
+
+ToneChain *tonechain_new(double sampleRate, int channels) {
+    if (sampleRate < 8000 || sampleRate > 384000 || channels < 1 || channels > MAXCH) return nullptr;
+    return new ToneChain(sampleRate, channels);
+}
+
+void tonechain_delete(ToneChain *chain) { delete chain; }
+
+void tonechain_set_tone(ToneChain *chain, double bassDb, double trebleDb) {
+    ToneStage &s = chain->tone;
+    if (bassDb == bassDb) s.wantB = std::max(-12.0, std::min(12.0, bassDb));  // NaN: unchanged
+    if (trebleDb == trebleDb) s.wantT = std::max(-12.0, std::min(12.0, trebleDb));
+}
+
+void tonechain_set_auto_eq(ToneChain *chain, int on, const double offsetsDb[5]) {
+    AutoEQ5 &a = chain->aeq;
+    a.on = on != 0;
+    for (int k = 0; k < AEQB; k++) {
+        double v = offsetsDb ? offsetsDb[k] : 0.0;
+        a.want[k] = v == v ? std::max(-12.0, std::min(12.0, v)) : 0.0;  // NaN: 0
+    }
+}
+
+void tonechain_get_auto_eq(const ToneChain *chain, double autoDb[5], double levelDb[5]) {
+    chain->aeq.readout.read(autoDb, levelDb);
+}
+
+void tonechain_process(ToneChain *chain, float *const *io, const float *ref, int frames) {
+    if (frames > 0) chain->process(io, ref, frames);
+}
+
+int tonechain_latency_frames(const ToneChain *chain) { return chain->lim.look; }
+
+}  // extern "C"

@@ -340,9 +340,9 @@ final class AdvancedWorker {
 //               [--tone-at "SECONDS:T,SECONDS:T"] [--auto-eq] [--eq-offsets a,b,c,d,e]
 // Shifts a sound file offline with the app's own code (normal mode or Advanced processing), for listening
 // samples and checks. The output lines up with the input (the delay is taken out) and has the same length.
-// --steps-at changes the amount while it plays, like moving the amount live. --tone-db: Advanced processing's bass
-// and treble in dB; --tone-amount: the Bass ↔ Treble slider (−1 … 1); --tone-at moves the slider while it plays.
-// --auto-eq / --eq-offsets: Advanced processing's Auto EQ on, and its manual offsets in dB (Sub … Air).
+// --steps-at changes the amount while it plays, like moving the amount live. --tone-db: bass and treble in dB;
+// --tone-amount: the Bass ↔ Treble slider (−1 … 1); --tone-at moves the slider while it plays. --auto-eq /
+// --eq-offsets: Auto EQ on, and its manual offsets in dB (Sub … Air). Normal mode and Advanced processing both.
 func renderFile(input: String, output: String, halfSteps: Float, advanced: Bool, changes: [(Double, Float)],
                 tone: (bass: Double, treble: Double) = (0, 0), toneChanges: [(Double, Float)] = [],
                 autoEQ: (on: Bool, offsets: [Double]) = (false, AdvancedProcessor.noOffsets)) throws {
@@ -436,6 +436,37 @@ func renderFile(input: String, output: String, halfSteps: Float, advanced: Bool,
                 }
             }
         }
+        // Then Bass ↔ Treble and Auto EQ, as Player does (here the shifted sound already lines up with the original).
+        guard let toneProcessor = ToneProcessor(sampleRate: rate) else { throw Problem(message: "Could not start Bass ↔ Treble.") }
+        toneProcessor.setTone(bass: tone.bass, treble: tone.treble)
+        toneProcessor.setAutoEQ(on: autoEQ.on, offsets: autoEQ.offsets)
+        let latency = toneProcessor.latencyFrames
+        var toned = [[Float](repeating: 0, count: length), [Float](repeating: 0, count: length)]
+        var original = zeros
+        var from = 0, to = -latency
+        while to < length {
+            let n = min(block, max(1, length + latency - from))
+            if let moved = toneChanges.last(where: { Int($0.0 * rate) <= from }) {
+                let db = AdvancedProcessor.toneDb(tilt: moved.1)
+                toneProcessor.setTone(bass: db.bass, treble: db.treble)
+            }
+            // Past the end of the file, zeros push the last of the sound out.
+            let take = max(0, min(n, length - from))
+            var inL = zeros, inR = zeros
+            for i in 0..<n { original[i] = i < take ? (inputs[0][from + i] + inputs[1][from + i]) / 2 : 0 }
+            for i in 0..<take { inL[i] = outputs[0][from + i]; inR[i] = outputs[1][from + i] }
+            inL.withUnsafeMutableBufferPointer { l in
+                inR.withUnsafeMutableBufferPointer { r in
+                    original.withUnsafeBufferPointer { toneProcessor.process(l.baseAddress!, r.baseAddress!, original: $0.baseAddress, frames: n) }
+                }
+            }
+            for i in 0..<n where to + i >= 0 && to + i < length {
+                toned[0][to + i] = inL[i]; toned[1][to + i] = inR[i]
+            }
+            from += n
+            to += n
+        }
+        outputs = toned
     }
 
     let settings: [String: Any] = [AVFormatIDKey: kAudioFormatLinearPCM, AVSampleRateKey: rate, AVNumberOfChannelsKey: 2,
