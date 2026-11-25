@@ -183,6 +183,7 @@ final class Player: HearPlayer {
     private var shifter: RubberBandState?
     private var halfSteps: Float
     private let toneProcessor: ToneProcessor?
+    private let meter: LevelMeter?
     // Auto EQ compares the shifted sound with the original at the same moment. Rubber Band's output lines up with its
     // input frame for frame (within about 15 ms; its delay is in how late it hands the sound back), so the original
     // (mono) is kept in a ring from Rubber Band's last reset, and shifted frame n goes with original frame n.
@@ -198,12 +199,14 @@ final class Player: HearPlayer {
     private(set) var dropouts = 0  // times the cushion ran dry (a tiny gap)
     private(set) var skips = 0     // times sound was skipped to catch up
 
-    // tone: bass and treble in dB, autoEQ: Auto EQ (see ToneProcessor), so a rebuilt player keeps them.
+    // tone: bass and treble in dB, autoEQ: Auto EQ (see ToneProcessor), so a rebuilt player keeps them. meter: measures
+    // what it plays, for the volume bar.
     init(device: AudioDeviceID, format: AVAudioFormat, halfSteps: Float, tone: (bass: Double, treble: Double) = (0, 0),
-         autoEQ: (on: Bool, offsets: [Double]) = (false, AdvancedProcessor.noOffsets)) throws {
+         autoEQ: (on: Bool, offsets: [Double]) = (false, AdvancedProcessor.noOffsets), meter: LevelMeter? = nil) throws {
         self.device = device
         self.format = format
         self.halfSteps = halfSteps
+        self.meter = meter
         toneProcessor = ToneProcessor(sampleRate: format.sampleRate)
         toneProcessor?.setTone(bass: tone.bass, treble: tone.treble)
         toneProcessor?.setAutoEQ(on: autoEQ.on, offsets: autoEQ.offsets)
@@ -296,6 +299,9 @@ final class Player: HearPlayer {
         }
         let frames = shifted.frameLength
         if queuedFrames + frames > maxFrames { skips += 1; return }  // falling behind: skip a bit to catch up
+        if let meter, let data = shifted.floatChannelData {
+            meter.measure(data[0], shifted.format.channelCount > 1 ? data[1] : data[0], frames: Int(frames))
+        }
         queuedFrames += frames
         node.scheduleBuffer(shifted) { [weak self] in
             audioQueue.async {
@@ -430,6 +436,9 @@ final class HearShifter {
     var autoEQReadout: (auto: [Float], level: [Float])? {
         audioQueue.sync { player?.autoEQReadout }
     }
+    // The volume bar: how loud it plays now, in dB (see LevelMeter); nil while nothing plays. Main thread.
+    var level: Float? { meter?.db }
+    private var meter: LevelMeter?  // the player's
     // Checks only: --as-device UID uses that device's tone and Auto EQ, whatever is playing; --tone-db B,T uses these
     // dB everywhere; --auto-eq / --eq-offsets use this Auto EQ everywhere, as given.
     var testOutputKey: String?
@@ -504,10 +513,11 @@ final class HearShifter {
 
     var report: String {
         let tone = toneText
+        let level = self.level.map { String(format: ", level=%.1f dB", $0) } ?? ""
         return audioQueue.sync {
             guard let player else { return "state=\(state), no player" }
             return "state=\(state), out=\(deviceName(player.device)) running=\(player.engine.isRunning), rate=\(Int(player.format.sampleRate)), " +
-                "frames=\(player.received), loudest=\(player.loudest), playing=\(player.isPlaying), processes=\(capturedProcesses)" +
+                "frames=\(player.received), loudest=\(player.loudest)\(level), playing=\(player.isPlaying), processes=\(capturedProcesses)" +
                 ((player as? AdvancedPlayer).map { ", advanced out loudest=\($0.outputLoudest)" } ?? "") + ", " + tone(player)
         }
     }
@@ -561,6 +571,7 @@ final class HearShifter {
         if let playerObserver { NotificationCenter.default.removeObserver(playerObserver) }
         playerObserver = nil
         playerKey = nil
+        meter = nil
         audioQueue.sync { player?.stop(); player = nil }
     }
 
@@ -643,18 +654,21 @@ final class HearShifter {
         let ring = capture?.ring
         if let playerObserver { NotificationCenter.default.removeObserver(playerObserver) }
         playerObserver = nil
+        let meter = LevelMeter(sampleRate: format.sampleRate)
+        self.meter = nil
         let result: Result<HearPlayer, Error> = audioQueue.sync {
             player?.stop()
             player = nil
             let made: Result<HearPlayer, Error> = Result {
-                if let ring { return try AdvancedPlayer(device: device, format: format, halfSteps: steps, tone: tone, autoEQ: eq, input: ring, recordSeconds: testRecordSeconds) }
-                return try Player(device: device, format: format, halfSteps: steps, tone: tone, autoEQ: eq)
+                if let ring { return try AdvancedPlayer(device: device, format: format, halfSteps: steps, tone: tone, autoEQ: eq, input: ring, recordSeconds: testRecordSeconds, meter: meter) }
+                return try Player(device: device, format: format, halfSteps: steps, tone: tone, autoEQ: eq, meter: meter)
             }
             if case .success(let p) = made { player = p }
             return made
         }
         switch result {
         case .success(let player):
+            self.meter = meter
             playerObserver = NotificationCenter.default.addObserver(forName: .AVAudioEngineConfigurationChange, object: player.engine, queue: .main) { [weak self] _ in
                 self?.outputChanged()
             }

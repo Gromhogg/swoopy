@@ -1726,11 +1726,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
     let autoEQStrip = AutoEQStrip()
     private var autoEQRow: CardRow!
     private var autoEQTimer: Timer?
-    // "Delay: about 0.21 s" at the bottom of What you hear, while sound plays through it (see showHearDelay).
+    // While sound plays through What you hear (see showHearLive): the volume bar right under the apps picker, and
+    // "Delay: about 0.21 s" at the bottom.
+    let levelBar = LevelBar()
+    private var levelRow: CardRow!
     let hearDelayLabel = NSTextField(labelWithString: "")
     private var hearDelayRow: CardRow!
-    private var hearCushion: Double?    // the cushion's part, averaged over a few seconds
-    private var hearDelayCheck = false  // the next check is coming
+    private var hearCushion: Double?                  // the cushion's part, averaged over a few seconds
+    private var hearDelayChecked: CFTimeInterval = 0  // when the delay was last checked
+    private var hearLiveTicking = false               // the next update is coming
     // The speakers or headphones playing now (followed even while What you hear is off).
     private var outputListener: Listener?
     private var outputUID = "", outputName = ""
@@ -1873,6 +1877,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
             self?.defaults.set(value, forKey: Keys.halfSteps)
             self?.refresh()
         }
+        addLevelRow()
         // The tone, Bass ... Treble, kept for each speakers or headphones.
         tone.mark = 0.5
         tone.onChange = { [weak self] value in self?.tonePicked(value) }
@@ -2547,18 +2552,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
 
     func windowDidChangeOcclusionState(_ notification: Notification) {
         updateAutoEQTimer()
-        showHearDelay()
+        showHearLive()
     }
 
-    // What you hear's delay line: it shows while sound plays through the card (there's no delay to show otherwise),
-    // and is checked again every half second while the window can be seen. Pictures show an example.
-    private func showHearDelay() {
+    // MARK: Volume bar and delay
+
+    // How loud it plays, in dB: a thin bar with the number beside it, right under the apps picker.
+    private func addLevelRow() {
+        levelRow = CardRow(views: [levelBar])
+        levelRow.isHidden = true
+        levelRow.onScale = { [unowned self] scale in levelBar.scale = scale }
+        hearCard.addRow(levelRow, tight: true)
+    }
+
+    // The volume bar and the delay line show while sound plays through What you hear (there's nothing to show
+    // otherwise). While the window can be seen they follow the sound: the bar 25 times a second (4 with Reduce Motion),
+    // the delay every half second. Pictures (hear-on) show an example: −14 dB, about 0.21 s.
+    private func showHearLive() {
         let delay: (cushion: Double, rest: Double)?
         if let preview {
             delay = preview.contains("hear-on") && !preview.contains("waiting") ? (0.06, 0.15) : nil
         } else {
             delay = hear.delay
         }
+        hearDelayChecked = CACurrentMediaTime()
         if let delay {
             let cushion = hearCushion.map { $0 * 0.75 + delay.cushion * 0.25 } ?? delay.cushion
             hearCushion = cushion
@@ -2570,14 +2587,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         if hearDelayRow.isHidden != (delay == nil) {
             Theme.crossfade(hearCard, 0.2)
             hearDelayRow.isHidden = delay == nil
+            levelRow.isHidden = delay == nil
+            levelBar.show(db: preview == nil ? -.infinity : -14)
             refit()
         }
-        guard delay != nil, preview == nil, !hearDelayCheck, window.isVisible, window.occlusionState.contains(.visible) else { return }
-        hearDelayCheck = true
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
-            self?.hearDelayCheck = false
-            self?.showHearDelay()
+        guard delay != nil, preview == nil, !hearLiveTicking else { return }
+        hearLiveTicking = true
+        followHearLive()
+    }
+
+    private func followHearLive() {
+        guard !levelRow.isHidden, window.isVisible, window.occlusionState.contains(.visible) else {
+            hearLiveTicking = false
+            return
         }
+        levelBar.show(db: hear.level ?? -.infinity)
+        if CACurrentMediaTime() - hearDelayChecked >= 0.5 { showHearLive() }
+        DispatchQueue.main.asyncAfter(deadline: .now() + (Theme.reduceMotion ? 0.25 : 0.04)) { [weak self] in self?.followHearLive() }
     }
 
     // The speakers or headphones changed: the tone slider and Auto EQ show theirs.
@@ -3035,7 +3061,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
             refit()
         }
         updateAutoEQTimer()
-        showHearDelay()
+        showHearLive()
         switch hear.state {
         case .playing(let speakers): hearCard.amount.toolTip = "Playing to \(speakers)"
         case .problem(let message): hearCard.amount.toolTip = message

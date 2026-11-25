@@ -129,8 +129,9 @@ func arg(_ name: String) -> String? {
 // name being changed, volume the first sound's volume slider and drop files being dragged over it; "tone" shows
 // Advanced processing on; --tone-amount sets the Bass ↔ Treble slider; slow turns on "Deeper when slow"; eq turns
 // on Auto EQ, and --eq-offsets sets its five sliders, which show only the offsets since no sound plays; without eq,
-// Auto EQ shows off; changer turns on the Voice changer with Woman (Your voice then shows off, even with voice-on:
-// only one at a time), changer-man with Man (--voice NAME: that voice, an added one too), --strength sets its
+// Auto EQ shows off; hear-on (without waiting) also shows the volume bar at −14 dB and the delay line; changer turns
+// on the Voice changer with Woman (Your voice then shows off, even with voice-on: only one at a time), changer-man
+// with Man (--voice NAME: that voice, an added one too), --strength sets its
 // Strength slider, changer-realistic/-loading/-fallback show the AI voice (the slider's default) working/getting
 // ready/standing in with Natural, changer-slider-* puts the "Faster ↔ More real" slider at Natural, the first AI
 // step, the default, the far right or NN percent, changer-intel the card as on an Intel Mac (the slider stays at
