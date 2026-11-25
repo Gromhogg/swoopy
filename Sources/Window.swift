@@ -1726,6 +1726,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
     let autoEQStrip = AutoEQStrip()
     private var autoEQRow: CardRow!
     private var autoEQTimer: Timer?
+    // "Delay: about 0.21 s" at the bottom of What you hear, while sound plays through it (see showHearDelay).
+    let hearDelayLabel = NSTextField(labelWithString: "")
+    private var hearDelayRow: CardRow!
+    private var hearCushion: Double?    // the cushion's part, averaged over a few seconds
+    private var hearDelayCheck = false  // the next check is coming
     // The speakers or headphones playing now (followed even while What you hear is off).
     private var outputListener: Listener?
     private var outputUID = "", outputName = ""
@@ -1891,6 +1896,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         // Advanced processing (music), at the bottom: keeps the song balanced at big shifts. Turning it on asks first.
         advancedSwitch.onChange = { [weak self] on in self?.advancedPicked(on) }
         hearCard.addRow(ShiftCard.switchRow("Advanced processing", advancedSwitch))
+        // The delay, like the Voice changer's.
+        hearDelayLabel.textColor = .secondaryLabelColor
+        hearDelayRow = CardRow(views: [hearDelayLabel])
+        hearDelayRow.isHidden = true
+        hearDelayRow.onScale = { [unowned self] scale in hearDelayLabel.font = .systemFont(ofSize: 11 + (scale - 1) * 2.5) }
+        hearCard.addRow(hearDelayRow, tight: true)
 
         style.onChange = { [weak self] value in self?.stylePicked(value) }
         testButton.bezelStyle = .rounded
@@ -2534,7 +2545,40 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         autoEQStrip.auto = hear.autoEQReadout?.auto ?? [Float](repeating: 0, count: 5)
     }
 
-    func windowDidChangeOcclusionState(_ notification: Notification) { updateAutoEQTimer() }
+    func windowDidChangeOcclusionState(_ notification: Notification) {
+        updateAutoEQTimer()
+        showHearDelay()
+    }
+
+    // What you hear's delay line: it shows while sound plays through the card (there's no delay to show otherwise),
+    // and is checked again every half second while the window can be seen. Pictures show an example.
+    private func showHearDelay() {
+        let delay: (cushion: Double, rest: Double)?
+        if let preview {
+            delay = preview.contains("hear-on") && !preview.contains("waiting") ? (0.06, 0.15) : nil
+        } else {
+            delay = hear.delay
+        }
+        if let delay {
+            let cushion = hearCushion.map { $0 * 0.75 + delay.cushion * 0.25 } ?? delay.cushion
+            hearCushion = cushion
+            let text = String(format: "Delay: about %.2f s", cushion + delay.rest)
+            if hearDelayLabel.stringValue != text { hearDelayLabel.stringValue = text }
+        } else {
+            hearCushion = nil
+        }
+        if hearDelayRow.isHidden != (delay == nil) {
+            Theme.crossfade(hearCard, 0.2)
+            hearDelayRow.isHidden = delay == nil
+            refit()
+        }
+        guard delay != nil, preview == nil, !hearDelayCheck, window.isVisible, window.occlusionState.contains(.visible) else { return }
+        hearDelayCheck = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            self?.hearDelayCheck = false
+            self?.showHearDelay()
+        }
+    }
 
     // The speakers or headphones changed: the tone slider and Auto EQ show theirs.
     func outputMoved() {
@@ -2991,6 +3035,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
             refit()
         }
         updateAutoEQTimer()
+        showHearDelay()
         switch hear.state {
         case .playing(let speakers): hearCard.amount.toolTip = "Playing to \(speakers)"
         case .problem(let message): hearCard.amount.toolTip = message
