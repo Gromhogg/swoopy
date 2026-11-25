@@ -122,15 +122,15 @@ func arg(_ name: String) -> String? {
 // --preview STATES [--size 800x400] [--cartoon-amount 0.5] [--tone-amount -0.4] [--eq-offsets 3,-2,0,1,-1]
 // [--strength 0.6]: show the window in a state for screenshots, without touching any sound or settings, and without
 // switching apps (states: hear-on, voice-on, waiting, typing, recording, playing, listening, hover, menu, roll, resize,
-// no-driver, advanced-alert, sounds, rename, volume, drop, light, tone, slow, eq, changer, changer-man,
+// no-driver, advanced-alert, sounds, rename, volume, drop, light, tone, slow, eq, level, changer, changer-man,
 // changer-realistic, changer-loading, changer-fallback, changer-slider-natural|fast|default|max|NN, changer-intel,
 // changer-second-off, changer-quiet-on, changer-card-off, click-voice, click-vc;
 // --cartoon-amount sets the voice style slider; sounds opens the Soundboard with example names, rename shows the first
 // name being changed, volume the first sound's volume slider and drop files being dragged over it; "tone" shows
 // Advanced processing on; --tone-amount sets the Bass ↔ Treble slider; slow turns on "Deeper when slow"; eq turns
 // on Auto EQ, and --eq-offsets sets its five sliders, which show only the offsets since no sound plays; without eq,
-// Auto EQ shows off; changer turns on the Voice changer with Woman (Your voice then shows off, even with voice-on:
-// only one at a time), changer-man with Man (--voice NAME: that voice, an added one too), --strength sets its
+// Auto EQ shows off; level (with hear-on) shows the volume bar at −14 dB; changer turns on the Voice changer with
+// Woman (Your voice then shows off, even with voice-on: only one at a time), changer-man with Man (--voice NAME: that voice, an added one too), --strength sets its
 // Strength slider, changer-realistic/-loading/-fallback show the AI voice (the slider's default) working/getting
 // ready/standing in with Natural, changer-slider-* puts the "Faster ↔ More real" slider at Natural, the first AI
 // step, the default, the far right or NN percent, changer-intel the card as on an Intel Mac (the slider stays at

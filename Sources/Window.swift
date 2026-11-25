@@ -1726,6 +1726,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
     let autoEQStrip = AutoEQStrip()
     private var autoEQRow: CardRow!
     private var autoEQTimer: Timer?
+    // The volume bar, right under the apps picker (see showLevel).
+    let levelBar = LevelBar()
+    private var levelRow: CardRow!
+    private var levelTicking = false
     // The speakers or headphones playing now (followed even while What you hear is off).
     private var outputListener: Listener?
     private var outputUID = "", outputName = ""
@@ -1868,6 +1872,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
             self?.defaults.set(value, forKey: Keys.halfSteps)
             self?.refresh()
         }
+        addLevelRow()
         // The tone, Bass ... Treble, kept for each speakers or headphones.
         tone.mark = 0.5
         tone.onChange = { [weak self] value in self?.tonePicked(value) }
@@ -2534,7 +2539,51 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         autoEQStrip.auto = hear.autoEQReadout?.auto ?? [Float](repeating: 0, count: 5)
     }
 
-    func windowDidChangeOcclusionState(_ notification: Notification) { updateAutoEQTimer() }
+    func windowDidChangeOcclusionState(_ notification: Notification) {
+        updateAutoEQTimer()
+        followLevel()
+    }
+
+    // MARK: Volume bar
+
+    // How loud it plays, in dB: a thin bar with the number beside it, right under the apps picker.
+    private func addLevelRow() {
+        levelRow = CardRow(views: [levelBar])
+        levelRow.isHidden = true
+        levelRow.onScale = { [unowned self] scale in levelBar.scale = scale }
+        hearCard.addRow(levelRow, tight: true)
+    }
+
+    // The bar shows while What you hear is on and playing to the speakers or headphones. Pictures: with hear-on and
+    // level it shows at −14 dB.
+    private func showLevel(hearOn: Bool) {
+        var playing = false
+        if case .playing = hear.state { playing = true }
+        let shown = hearOn && (preview.map { $0.contains("level") } ?? playing)
+        if levelRow.isHidden == shown {
+            Theme.crossfade(hearCard, 0.2)
+            levelRow.isHidden = !shown
+            levelBar.show(db: preview == nil ? -.infinity : -14)
+            refit()
+        }
+        followLevel()
+    }
+
+    // The bar follows the sound 25 times a second (4 with Reduce Motion), only while it can be seen.
+    private func followLevel() {
+        guard preview == nil, !levelTicking else { return }
+        levelTicking = true
+        nextLevel()
+    }
+
+    private func nextLevel() {
+        guard !levelRow.isHidden, window.isVisible, window.occlusionState.contains(.visible) else {
+            levelTicking = false
+            return
+        }
+        levelBar.show(db: hear.level ?? -.infinity)
+        DispatchQueue.main.asyncAfter(deadline: .now() + (Theme.reduceMotion ? 0.25 : 0.04)) { [weak self] in self?.nextLevel() }
+    }
 
     // The speakers or headphones changed: the tone slider and Auto EQ show theirs.
     func outputMoved() {
@@ -2991,6 +3040,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
             refit()
         }
         updateAutoEQTimer()
+        showLevel(hearOn: hearOn)
         switch hear.state {
         case .playing(let speakers): hearCard.amount.toolTip = "Playing to \(speakers)"
         case .problem(let message): hearCard.amount.toolTip = message
