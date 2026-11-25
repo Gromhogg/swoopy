@@ -160,9 +160,10 @@ final class AdvancedPlayer: HearPlayer {
 
     // recordSeconds > 0 (checks only): also keeps what is sent to the speakers, for `saveRecording`.
     // tone: bass and treble in dB (see setTone), autoEQ: Auto EQ (see setAutoEQ), so a rebuilt player keeps them.
+    // meter: measures what it plays, for the volume bar.
     init(device: AudioDeviceID, format: AVAudioFormat, halfSteps: Float, tone: (bass: Double, treble: Double) = (0, 0),
          autoEQ: (on: Bool, offsets: [Double]) = (false, AdvancedProcessor.noOffsets),
-         input: SoundRing, recordSeconds: Double = 0) throws {
+         input: SoundRing, recordSeconds: Double = 0, meter: LevelMeter? = nil) throws {
         self.device = device
         self.format = format
         guard let processor = AdvancedProcessor(sampleRate: format.sampleRate, halfSteps: halfSteps) else {
@@ -172,7 +173,7 @@ final class AdvancedPlayer: HearPlayer {
         processor.setAutoEQ(on: autoEQ.on, offsets: autoEQ.offsets)
         let wanted = AdvancedWanted(halfSteps: halfSteps, bassDb: tone.bass, trebleDb: tone.treble,
                                     autoEQOn: autoEQ.on, autoEQOffsets: autoEQ.offsets)
-        worker = AdvancedWorker(processor: processor, input: input, wanted: wanted, recordFrames: Int(recordSeconds * format.sampleRate))
+        worker = AdvancedWorker(processor: processor, input: input, wanted: wanted, recordFrames: Int(recordSeconds * format.sampleRate), meter: meter)
         // The cushion before the speakers: like normal mode (starts at 50 ms, at most 150 ms).
         let ring = worker.output.ring
         let start = Int32(format.sampleRate * 0.05), most = Int32(format.sampleRate * 0.15)
@@ -263,15 +264,17 @@ final class AdvancedWorker {
     private(set) var outputLoudest: Float = 0
     let record: (left: UnsafeMutablePointer<Float>, right: UnsafeMutablePointer<Float>, capacity: Int)?
     private(set) var recorded = 0
+    private let meter: LevelMeter?
     private let keepGoing = OSAllocatedUnfairLock(initialState: true)
     private let done = DispatchSemaphore(value: 0)
     private var thread: Thread?
     private let block = 1024
     private let scratch: [UnsafeMutablePointer<Float>]
 
-    init(processor: AdvancedProcessor, input: SoundRing, wanted: AdvancedWanted, recordFrames: Int = 0) {
+    init(processor: AdvancedProcessor, input: SoundRing, wanted: AdvancedWanted, recordFrames: Int = 0, meter: LevelMeter? = nil) {
         self.processor = processor
         self.input = input
+        self.meter = meter
         output = SoundRing(seconds: 2, sampleRate: input.sampleRate)
         self.wanted = OSAllocatedUnfairLock(initialState: wanted)
         scratch = (0..<4).map { _ in UnsafeMutablePointer<Float>.allocate(capacity: 1024) }
@@ -324,6 +327,7 @@ final class AdvancedWorker {
                 processor.process(inL, inR, outL, outR, n)
                 audio_ring_write(output.ring, outL, outR, Int32(n))
                 vDSP_maxmgv(outL, 1, &peak, vDSP_Length(n)); outputLoudest = max(outputLoudest, peak)
+                meter?.measure(outL, outR, frames: n)
                 if let record, recorded < record.capacity {
                     let m = min(n, record.capacity - recorded)
                     (record.left + recorded).update(from: outL, count: m)
