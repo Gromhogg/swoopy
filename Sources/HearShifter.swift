@@ -539,6 +539,15 @@ final class HearShifter {
         }
     }
 
+    // For the window: the delay from an app to the speakers or headphones (as macOS reports theirs), in seconds, as
+    // the cushion (it moves a little with each piece of sound) and the rest. nil while nothing plays.
+    var delay: (cushion: Double, rest: Double)? {
+        audioQueue.sync {
+            guard let t = player?.delays else { return nil }
+            return (t.cushion / 1000, (t.shifter + t.device) / 1000)
+        }
+    }
+
     private func setState(_ new: HearState) {
         guard new != state else { return }
         state = new
